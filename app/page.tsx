@@ -1,3 +1,4 @@
+
 import { fetchSupabaseRows, type SupabaseRow } from "@/lib/supabase";
 
 type PageData = {
