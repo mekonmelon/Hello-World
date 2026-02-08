@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Assignment 2 - Connecting Next.js to Supabase
 
-## Getting Started
+This project extends Assignment 1 by reading rows from an existing Supabase table and rendering them in a list/table UI.
 
-First, run the development server:
+## What the finished app should do
+
+- Uses your existing Next.js app from Assignment 1.
+- Reads Supabase connection values from environment variables (no hardcoded keys).
+- Fetches rows from a pre-existing table.
+- Renders those rows in a table on the home page.
+- Deploys successfully on Vercel with the same env vars configured.
+
+## 1) Configure environment variables
+
+Create `.env.local` from `.env.example`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then fill in:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_TABLE=countries
+SUPABASE_SELECT=*
+SUPABASE_LIMIT=20
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Notes:
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required.
+- `SUPABASE_TABLE`, `SUPABASE_SELECT`, and `SUPABASE_LIMIT` are optional helpers for this assignment.
+- If your anon key was posted publicly (for example in a screenshot), rotate it in Supabase.
 
-## Learn More
+## 2) Run locally
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open `http://localhost:3000`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+You should see:
+- A **Supabase Data Viewer** heading.
+- A table with rows from the configured table.
+- Helpful empty/error states if config or permissions are wrong.
 
-## Deploy on Vercel
+## 3) If data does not show
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Check these common issues:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Table name mismatch (`SUPABASE_TABLE`).
+2. Row Level Security policy blocks reads for anon users.
+3. Missing env vars or typo in `.env.local`.
+4. Empty table (no rows yet).
+
+## 4) Deploy to Vercel
+
+1. Push this repo to GitHub.
+2. Import the project into Vercel.
+3. In Vercel project settings, add the same environment variables from `.env.local`.
+4. Redeploy.
+5. Open the deployed URL in an incognito window and confirm rows render.
+
+## 5) Submit
+
+Submit your deployed Vercel URL in your class submissions area.
+
+---
+
+## Implementation overview
+
+- `lib/supabase.ts` builds a REST request to Supabase using env vars and fetches rows.
+- `app/page.tsx` is an async server component that loads rows and renders them in a dynamic table.
+- `.env.example` documents required and optional configuration.
