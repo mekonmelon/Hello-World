@@ -15,30 +15,38 @@ This project builds on Assignments 1 and 2 by adding **Google OAuth** through Su
 
 1. In Supabase, go to **Authentication → Providers → Google**.
 2. Paste the **Client ID** your instructor provided.
-3. If your course requires "no client secret", leave it blank; if Supabase requires one for your project settings, use your Google OAuth web client secret.
-4. Leave **Skip nonce checks** OFF unless your instructor explicitly says to enable it.
-5. Save the provider settings.
+3. **Do not** add a client secret (assignment says this is OK).
+4. Make sure the **Redirect URI** is exactly:
 
-### Important callback detail (this is the common confusion)
+```
+/auth/callback
+```
 
-There are **two callback URLs** in this flow:
+In the Google console, add both:
 
-- **Google → Supabase callback**: this must be the Supabase callback URL shown in the provider screen, usually:
-  - `https://<your-project-ref>.supabase.co/auth/v1/callback`
-- **Supabase → your app callback**: this app uses:
-  - `/auth/callback`
-
-In **Google Cloud Console**, add these as authorized redirect URIs:
-
-- `https://<your-project-ref>.supabase.co/auth/v1/callback`
-- `http://localhost:3000/auth/callback` (for local testing of direct app redirects)
-- `https://YOUR-VERCEL-DOMAIN.vercel.app/auth/callback` (for deployed app redirects)
+- `http://localhost:3000/auth/callback`
+- `https://YOUR-VERCEL-DOMAIN.vercel.app/auth/callback`
 
 ---
 
 ## 2) Add environment variables
 
 Copy `.env.example` → `.env.local` and fill in values:
+# Assignment 2 - Connecting Next.js to Supabase
+
+This project extends Assignment 1 by reading rows from an existing Supabase table and rendering them in a list/table UI.
+
+## What the finished app should do
+
+- Uses your existing Next.js app from Assignment 1.
+- Reads Supabase connection values from environment variables (no hardcoded keys).
+- Fetches rows from a pre-existing table.
+- Renders those rows in a table on the home page.
+- Deploys successfully on Vercel with the same env vars configured.
+
+## 1) Configure environment variables
+
+Create `.env.local` from `.env.example`:
 
 ```bash
 cp .env.example .env.local
@@ -55,6 +63,22 @@ These are required for both local dev and Vercel.
 ---
 
 ## 3) Run locally
+Then fill in:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_TABLE=countries
+SUPABASE_SELECT=*
+SUPABASE_LIMIT=20
+```
+
+Notes:
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required.
+- `SUPABASE_TABLE`, `SUPABASE_SELECT`, and `SUPABASE_LIMIT` are optional helpers for this assignment.
+- If your anon key was posted publicly (for example in a screenshot), rotate it in Supabase.
+
+## 2) Run locally
 
 ```bash
 npm install
@@ -76,48 +100,6 @@ After signing in you should land on:
 This page should show your email and a **Sign out** button.
 
 ---
-
-## Troubleshooting: "Parsing ecmascript source code failed" on `app/page.tsx`
-
-If localhost shows an error like `Unexpected token` in `app/page.tsx` (often near the last line), it usually means there is a merge artifact or extra brace in your local file.
-
-1. Open `app/page.tsx` and remove any conflict markers:
-   - `<<<<<<<`
-   - `=======`
-   - `>>>>>>>`
-2. Make sure the file ends with exactly one closing `}` for the component.
-3. If you want to reset to this repo's working version, run:
-
-```bash
-git checkout -- app/page.tsx
-```
-
-4. Restart the dev server:
-
-```bash
-npm run dev
-```
-
-## Troubleshooting: `Could not find the table ...` / `PGRST205`
-
-If you see an error like `Could not find the table 'public.countries'`, your app is pointing at a table that does not exist in your Supabase project.
-
-Fix:
-
-1. In Supabase table editor, confirm an existing table name (for example `images` or `communities`).
-2. In `.env.local`, set:
-
-```env
-SUPABASE_TABLE=images
-```
-
-3. Restart dev server:
-
-```bash
-npm run dev
-```
-
-4. If deployed on Vercel, add/update `SUPABASE_TABLE` in Vercel environment variables and redeploy.
 
 ## 5) Deploy to Vercel
 
@@ -141,3 +123,38 @@ npm run dev
 ## Assignment submission
 
 Submit your deployed Vercel URL in the “Submissions” section.
+Open `http://localhost:3000`.
+
+You should see:
+- A **Supabase Data Viewer** heading.
+- A table with rows from the configured table.
+- Helpful empty/error states if config or permissions are wrong.
+
+## 3) If data does not show
+
+Check these common issues:
+
+1. Table name mismatch (`SUPABASE_TABLE`).
+2. Row Level Security policy blocks reads for anon users.
+3. Missing env vars or typo in `.env.local`.
+4. Empty table (no rows yet).
+
+## 4) Deploy to Vercel
+
+1. Push this repo to GitHub.
+2. Import the project into Vercel.
+3. In Vercel project settings, add the same environment variables from `.env.local`.
+4. Redeploy.
+5. Open the deployed URL in an incognito window and confirm rows render.
+
+## 5) Submit
+
+Submit your deployed Vercel URL in your class submissions area.
+
+---
+
+## Implementation overview
+
+- `lib/supabase.ts` builds a REST request to Supabase using env vars and fetches rows.
+- `app/page.tsx` is an async server component that loads rows and renders them in a dynamic table.
+- `.env.example` documents required and optional configuration.
