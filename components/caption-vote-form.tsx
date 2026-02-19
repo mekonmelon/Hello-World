@@ -52,7 +52,7 @@ export function CaptionVoteForm() {
       <label className="block text-sm text-slate-200">
         Caption ID
         <input
-          type="number"
+          type="text"
           min={1}
           value={captionId}
           onChange={(event) => setCaptionId(event.target.value)}
