@@ -8,7 +8,7 @@ type VotePayload = {
 
 const DEFAULT_TABLE = "caption_votes";
 const DEFAULT_CAPTION_COLUMN = "caption_id";
-const DEFAULT_SCORE_COLUMN = "vote";
+const DEFAULT_SCORE_COLUMN = "vote_value"; 
 
 type ParsedPayload = {
   captionId: string | number;
