@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Assignment 4 - Mutating Data (caption_votes)
 
-## Getting Started
+This project now extends Assignment 3 by letting authenticated users **insert votes** into a Supabase table.
 
-First, run the development server:
+## What is implemented
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Google OAuth login flow via Supabase (from Assignment 3).
+- Protected route at `/protected`.
+- Vote form on `/protected` that POSTs to `/api/caption-votes`.
+- API route that inserts a row into `caption_votes` (or a configured table).
+
+---
+
+## Step-by-step: how to complete Week 4
+
+## 1) Keep your Assignment 3 auth working
+
+You still need these env vars:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If you deploy on Vercel, set `NEXT_PUBLIC_SITE_URL` to your production URL.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 2) Configure mutation table/columns (important)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+By default, this app inserts into:
 
-## Learn More
+- table: `caption_votes`
+- caption id column: `caption_id`
+- score column: `vote`
+- optional user id column: disabled by default (set if your schema requires it)
 
-To learn more about Next.js, take a look at the following resources:
+If your schema uses different names, add these optional env vars:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+CAPTION_VOTES_TABLE=caption_votes
+CAPTION_VOTES_CAPTION_ID_COLUMN=caption_id
+CAPTION_VOTES_SCORE_COLUMN=vote
+CAPTION_VOTES_USER_ID_COLUMN=user_id
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3) Start the dev server
 
-## Deploy on Vercel
+```bash
+npm install
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open `http://localhost:3000`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 4) Submit a vote
+
+1. Click **Go to protected page**.
+2. If prompted, sign in with Google.
+3. In **Rate a caption** form:
+   - enter a caption ID (e.g., `42`)
+   - enter score 1-5
+4. Click **Submit vote**.
+
+Note: `captionId` can be either a numeric ID or a UUID/string value.
+
+You should see a success message showing the inserted row.
+
+## 5) Verify in Supabase
+
+Open Supabase Table Editor and check `caption_votes` for a new row.
+
+If insert fails, most likely causes:
+
+- table/column names do not match your schema
+- your schema requires a user id column and `CAPTION_VOTES_USER_ID_COLUMN` is not set
+- RLS policy does not allow authenticated insert
+- score/caption_id validation fails
+
+## 6) Deploy to Vercel and submit
+
+1. Push to GitHub.
+2. Redeploy in Vercel.
+3. Add/update all env vars in Vercel.
+4. Test one vote on deployed site.
+5. Submit your deployed Vercel URL.
+
+---
+
+## Routes added/used
+
+- `GET /auth/login` → starts OAuth
+- `GET /auth/callback` → handles token exchange
+- `GET /auth/logout` → clears auth cookies
+- `GET /protected` → gated page with vote form
+- `POST /api/caption-votes` → inserts vote row into Supabase
