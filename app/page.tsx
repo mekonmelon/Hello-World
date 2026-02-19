@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
