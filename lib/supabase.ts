@@ -1,6 +1,6 @@
 export type SupabaseRow = Record<string, unknown>;
 
-const DEFAULT_TABLE = "countries";
+const DEFAULT_TABLE = "images";
 const DEFAULT_SELECT = "*";
 const DEFAULT_LIMIT = 20;
 
@@ -41,7 +41,7 @@ export async function fetchSupabaseRows(): Promise<{
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`Supabase query failed (${response.status}): ${details}`);
+    throw new Error(`Supabase query failed (${response.status}): ${details}. Set SUPABASE_TABLE to an existing table (for example: images or communities).`);
   }
 
   const rows = (await response.json()) as SupabaseRow[];

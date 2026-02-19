@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { CaptionVoteForm } from "@/components/caption-vote-form";
 
 async function getUserEmail() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,15 +40,20 @@ export default async function ProtectedPage() {
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
         <header className="space-y-3">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
-            Assignment 3
+            Assignment 4
           </p>
-          <h1 className="text-4xl font-semibold">Protected Route</h1>
+          <h1 className="text-4xl font-semibold">Mutating Data</h1>
         </header>
 
         {email ? (
-          <div className="space-y-3 text-slate-200">
-            <p>You are signed in as <span className="font-semibold text-white">{email}</span>.</p>
-            <p>This gated content only appears after authentication.</p>
+          <div className="space-y-5 text-slate-200">
+            <p>
+              You are signed in as <span className="font-semibold text-white">{email}</span>.
+            </p>
+            <p>Submit votes below to insert rows into your caption_votes table.</p>
+            <section id="rate-caption">
+              <CaptionVoteForm />
+            </section>
             <a
               className="inline-flex w-fit items-center justify-center rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               href="/auth/logout"

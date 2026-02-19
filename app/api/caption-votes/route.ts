@@ -10,6 +10,11 @@ const DEFAULT_TABLE = "caption_votes";
 const DEFAULT_CAPTION_COLUMN = "caption_id";
 const DEFAULT_SCORE_COLUMN = "vote";
 
+type ParsedPayload = {
+  captionId: string | number;
+  score: number;
+};
+
 function getSupabaseEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -21,19 +26,48 @@ function getSupabaseEnv() {
   return { supabaseUrl, anonKey };
 }
 
-function parseVotePayload(payload: VotePayload) {
-  const captionId = Number(payload.captionId);
-  const score = Number(payload.score);
+function parseVotePayload(payload: VotePayload): ParsedPayload | { error: string } {
+  const rawCaptionId = (payload.captionId ?? "").trim();
+  const rawScore = Number(payload.score);
 
-  if (!Number.isInteger(captionId) || captionId <= 0) {
-    return { error: "Caption ID must be a positive integer." };
+  if (!rawCaptionId) {
+    return { error: "Caption ID is required." };
   }
 
-  if (!Number.isFinite(score) || score < 1 || score > 5) {
+  if (!Number.isFinite(rawScore) || rawScore < 1 || rawScore > 5) {
     return { error: "Score must be a number between 1 and 5." };
   }
 
-  return { captionId, score };
+  const numericCaptionId = Number(rawCaptionId);
+  const captionId = Number.isInteger(numericCaptionId)
+    ? numericCaptionId
+    : rawCaptionId;
+
+  return {
+    captionId,
+    score: Math.trunc(rawScore),
+  };
+}
+
+async function getAuthenticatedUserId(params: {
+  supabaseUrl: string;
+  anonKey: string;
+  accessToken: string;
+}) {
+  const response = await fetch(new URL("/auth/v1/user", params.supabaseUrl), {
+    headers: {
+      apikey: params.anonKey,
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const user = (await response.json()) as { id?: string };
+  return user.id ?? null;
 }
 
 export async function POST(request: Request) {
@@ -57,6 +91,29 @@ export async function POST(request: Request) {
     const captionColumn =
       process.env.CAPTION_VOTES_CAPTION_ID_COLUMN ?? DEFAULT_CAPTION_COLUMN;
     const scoreColumn = process.env.CAPTION_VOTES_SCORE_COLUMN ?? DEFAULT_SCORE_COLUMN;
+    const userIdColumn = process.env.CAPTION_VOTES_USER_ID_COLUMN;
+
+    const row: Record<string, string | number> = {
+      [captionColumn]: parsed.captionId,
+      [scoreColumn]: parsed.score,
+    };
+
+    if (userIdColumn) {
+      const userId = await getAuthenticatedUserId({
+        supabaseUrl,
+        anonKey,
+        accessToken,
+      });
+
+      if (!userId) {
+        return NextResponse.json(
+          { error: "Could not resolve signed-in user for vote insert." },
+          { status: 401 },
+        );
+      }
+
+      row[userIdColumn] = userId;
+    }
 
     const endpoint = new URL(`/rest/v1/${tableName}`, supabaseUrl);
 
@@ -68,12 +125,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${accessToken}`,
         Prefer: "return=representation",
       },
-      body: JSON.stringify([
-        {
-          [captionColumn]: parsed.captionId,
-          [scoreColumn]: parsed.score,
-        },
-      ]),
+      body: JSON.stringify([row]),
     });
 
     if (!response.ok) {
