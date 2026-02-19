@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { CaptionVoteForm } from "@/components/caption-vote-form";
 
 async function getUserEmail() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
