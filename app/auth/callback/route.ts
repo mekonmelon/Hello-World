@@ -77,5 +77,26 @@ export async function GET(request: Request) {
 
   cookieStore.delete("sb-code-verifier");
 
-  return NextResponse.redirect(new URL("/protected", getBaseUrl()));
+
+// Create the redirect response object
+  const redirectResponse = NextResponse.redirect(new URL("/protected", getBaseUrl()));
+
+  // Manually attach the cookies to the redirect so the browser saves them immediately
+  redirectResponse.cookies.set("sb-access-token", tokenData.access_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: tokenData.expires_in,
+    path: "/",
+  });
+
+  redirectResponse.cookies.set("sb-refresh-token", tokenData.refresh_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+  });
+
+  return redirectResponse;
 }
