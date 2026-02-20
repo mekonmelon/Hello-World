@@ -1,95 +1,55 @@
-# Assignment 4 - Mutating Data (caption_votes)
+# Week 4 - Captions + Images + Voting
 
-This project now extends Assignment 3 by letting authenticated users **insert votes** into a Supabase table.
+This app now supports:
+- Google-authenticated users
+- showing **one caption/image at a time** from Supabase
+- submitting **upvote (+1)** or **downvote (-1)** into `caption_votes`
 
-## What is implemented
+## 1) Why your deploy failed
 
-- Google OAuth login flow via Supabase (from Assignment 3).
-- Protected route at `/protected`.
-- Vote form on `/protected` that POSTs to `/api/caption-votes`.
-- API route that inserts a row into `caption_votes` (or a configured table).
+Your Vercel log showed:
 
----
+`Can't resolve '@/utils/supabase/server'`
 
-## Step-by-step: how to complete Week 4
+That file/module does not exist in this repo. The app now uses existing local helpers and direct Supabase REST calls, so no `@/utils/supabase/server` import is needed.
 
-## 1) Keep your Assignment 3 auth working
+## 2) Environment variables
 
-You still need these env vars:
+Copy:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```bash
+cp .env.example .env.local
 ```
 
-If you deploy on Vercel, set `NEXT_PUBLIC_SITE_URL` to your production URL.
+Then set real values for:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL`
 
-## 2) Configure mutation table/columns (important)
+Optional schema mapping vars are in `.env.example` for captions/images/votes.
 
-By default, this app inserts into:
-
-- table: `caption_votes`
-- caption id column: `caption_id`
-- score column: `vote`
-- optional user id column: disabled by default (set if your schema requires it)
-
-If your schema uses different names, add these optional env vars:
-
-```env
-CAPTION_VOTES_TABLE=caption_votes
-CAPTION_VOTES_CAPTION_ID_COLUMN=caption_id
-CAPTION_VOTES_SCORE_COLUMN=vote
-CAPTION_VOTES_USER_ID_COLUMN=user_id
-```
-
-## 3) Start the dev server
+## 3) Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000`, then click **Go to protected page (Week 4 form)**.
 
-## 4) Submit a vote
+## 4) Vote flow
 
-1. Click **Go to protected page**.
-2. If prompted, sign in with Google.
-3. In **Rate a caption** form:
-   - enter a caption ID (e.g., `42`)
-   - enter score 1-5
-4. Click **Submit vote**.
+1. Sign in.
+2. You will see one caption card at a time with image (if found).
+3. Click **Upvote (+1)** or **Downvote (-1)**.
+4. App inserts a row into `caption_votes`.
 
-Note: `captionId` can be either a numeric ID or a UUID/string value.
+## 5) Supabase checks if inserts fail
 
-You should see a success message showing the inserted row.
+- `caption_votes` table/column names match env vars.
+- If your table requires `user_id`, set `CAPTION_VOTES_USER_ID_COLUMN=user_id`.
+- RLS policy allows authenticated insert.
 
-## 5) Verify in Supabase
+## 6) Deploy
 
-Open Supabase Table Editor and check `caption_votes` for a new row.
-
-If insert fails, most likely causes:
-
-- table/column names do not match your schema
-- your schema requires a user id column and `CAPTION_VOTES_USER_ID_COLUMN` is not set
-- RLS policy does not allow authenticated insert
-- score/caption_id validation fails
-
-## 6) Deploy to Vercel and submit
-
-1. Push to GitHub.
-2. Redeploy in Vercel.
-3. Add/update all env vars in Vercel.
-4. Test one vote on deployed site.
-5. Submit your deployed Vercel URL.
-
----
-
-## Routes added/used
-
-- `GET /auth/login` → starts OAuth
-- `GET /auth/callback` → handles token exchange
-- `GET /auth/logout` → clears auth cookies
-- `GET /protected` → gated page with vote form
-- `POST /api/caption-votes` → inserts vote row into Supabase
+Set the same env vars in Vercel Project Settings, redeploy, then test one vote on production.

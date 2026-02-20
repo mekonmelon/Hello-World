@@ -10,47 +10,72 @@ type TokenResponse = {
 };
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (code) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    
-    // Use the fetch API to exchange the code for a session
-    // This handles the verifier and PKCE flow correctly
-    const tokenUrl = `${supabaseUrl}/auth/v1/token?grant_type=pkce`;
-    const cookieStore = await cookies();
-    const codeVerifier = cookieStore.get("sb-code-verifier")?.value;
-
-    const res = await fetch(tokenUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: anonKey },
-      body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
-    });
-
-    if (res.ok) {
-      const tokenData = await res.json();
-      const redirectResponse = NextResponse.redirect(`${origin}/protected`);
-
-      // Set the cookies directly on the redirect response
-      redirectResponse.cookies.set("sb-access-token", tokenData.access_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/",
-      });
-      redirectResponse.cookies.set("sb-refresh-token", tokenData.refresh_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/",
-      });
-
-      return redirectResponse;
-    }
+  if (!supabaseUrl || !anonKey) {
+    return NextResponse.redirect(
+      new URL("/auth/error?reason=missing-env", getBaseUrl()),
+    );
   }
 
-  // If anything fails, return to home or an error page
-  return NextResponse.redirect(`${origin}/auth/error?reason=token-exchange`);
+  const { searchParams } = new URL(request.url);
+  const code = searchParams.get("code");
+
+  if (!code) {
+    return NextResponse.redirect(
+      new URL("/auth/error?reason=missing-code", getBaseUrl()),
+    );
+  }
+
+  const cookieStore = await cookies();
+  const codeVerifier = cookieStore.get("sb-code-verifier")?.value;
+
+  if (!codeVerifier) {
+    return NextResponse.redirect(
+      new URL("/auth/error?reason=missing-verifier", getBaseUrl()),
+    );
+  }
+
+  const tokenUrl = new URL("/auth/v1/token?grant_type=pkce", supabaseUrl);
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: anonKey,
+    },
+    body: JSON.stringify({
+      auth_code: code,
+      code_verifier: codeVerifier,
+    }),
+  });
+
+  if (!response.ok) {
+    return NextResponse.redirect(
+      new URL("/auth/error?reason=token-exchange", getBaseUrl()),
+    );
+  }
+
+  const tokenData = (await response.json()) as TokenResponse;
+
+  cookieStore.set("sb-access-token", tokenData.access_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: tokenData.expires_in,
+    path: "/",
+  });
+
+  cookieStore.set("sb-refresh-token", tokenData.refresh_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 30,
+    path: "/",
+  });
+
+  cookieStore.delete("sb-code-verifier");
+
+  return NextResponse.redirect(new URL("/protected", getBaseUrl()));
 }

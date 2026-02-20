@@ -3,16 +3,16 @@ import { NextResponse } from "next/server";
 
 type VotePayload = {
   captionId: string;
-  score: string;
+  vote: string;
 };
 
 const DEFAULT_TABLE = "caption_votes";
 const DEFAULT_CAPTION_COLUMN = "caption_id";
-const DEFAULT_SCORE_COLUMN = "vote_value"; 
+const DEFAULT_VOTE_COLUMN = "vote";
 
 type ParsedPayload = {
   captionId: string | number;
-  score: number;
+  vote: 1 | -1;
 };
 
 function getSupabaseEnv() {
@@ -28,14 +28,14 @@ function getSupabaseEnv() {
 
 function parseVotePayload(payload: VotePayload): ParsedPayload | { error: string } {
   const rawCaptionId = (payload.captionId ?? "").trim();
-  const rawScore = Number(payload.score);
+  const rawVote = Number(payload.vote);
 
   if (!rawCaptionId) {
     return { error: "Caption ID is required." };
   }
 
-  if (!Number.isFinite(rawScore) || rawScore < 1 || rawScore > 5) {
-    return { error: "Score must be a number between 1 and 5." };
+  if (rawVote !== 1 && rawVote !== -1) {
+    return { error: "Vote must be 1 (upvote) or -1 (downvote)." };
   }
 
   const numericCaptionId = Number(rawCaptionId);
@@ -45,7 +45,7 @@ function parseVotePayload(payload: VotePayload): ParsedPayload | { error: string
 
   return {
     captionId,
-    score: Math.trunc(rawScore),
+    vote: rawVote,
   };
 }
 
@@ -90,15 +90,12 @@ export async function POST(request: Request) {
     const tableName = process.env.CAPTION_VOTES_TABLE ?? DEFAULT_TABLE;
     const captionColumn =
       process.env.CAPTION_VOTES_CAPTION_ID_COLUMN ?? DEFAULT_CAPTION_COLUMN;
-    const scoreColumn = process.env.CAPTION_VOTES_SCORE_COLUMN ?? DEFAULT_SCORE_COLUMN;
+    const voteColumn = process.env.CAPTION_VOTES_VOTE_COLUMN ?? DEFAULT_VOTE_COLUMN;
     const userIdColumn = process.env.CAPTION_VOTES_USER_ID_COLUMN;
 
     const row: Record<string, string | number> = {
       [captionColumn]: parsed.captionId,
-      [scoreColumn]: parsed.score,
-
-      created_datetime_utc: new Date().toISOString(),
-      modified_datetime_utc: new Date().toISOString(),
+      [voteColumn]: parsed.vote,
     };
 
     if (userIdColumn) {

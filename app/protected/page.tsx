@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { createClient } from "@/utils/supabase/server"; // ADD THIS LINE
 import CaptionVoteForm from "@/components/caption-vote-form";
+import { fetchCaptionCards } from "@/lib/caption-feed";
 
 async function getUserEmail() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,47 +35,43 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-  
-  // 1. ADD THIS LINE TO DEFINE SUPABASE
-  const supabase = await createClient(); 
-
-  // 2. Now 'supabase' is defined and can be used here
-  const { data: captions } = await supabase
-    .from('captions')
-    .select(`
-      id,
-      caption_text,
-      images (image_url)
-    `)
-    .limit(1)
-    .single(); 
+  const captions = email ? await fetchCaptionCards().catch(() => []) : [];
 
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
         <header className="space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Assignment 4</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
+            Assignment 4
+          </p>
           <h1 className="text-4xl font-semibold">Mutating Data</h1>
         </header>
 
         {email ? (
           <div className="space-y-5 text-slate-200">
-            <p>You are signed in as <span className="font-semibold text-white">{email}</span>.</p>
-            
+            <p>
+              You are signed in as <span className="font-semibold text-white">{email}</span>.
+            </p>
+            <p>Vote on one caption at a time. Each click inserts +1 or -1 in caption_votes.</p>
             <section id="rate-caption">
-              {captions ? (
-                <CaptionVoteForm caption={captions} />
-              ) : (
-                <p>Loading caption...</p>
-              )}
+              <CaptionVoteForm captions={captions} />
             </section>
-
-            <a className="inline-flex items-center justify-center rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors" href="/auth/logout">Sign out</a>
+            <a
+              className="inline-flex w-fit items-center justify-center rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+              href="/auth/logout"
+            >
+              Sign out
+            </a>
           </div>
         ) : (
           <div className="space-y-3 text-slate-200">
             <p>{error ?? "You must sign in to view this page."}</p>
-            <a className="inline-flex items-center justify-center rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 transition-colors" href="/auth/login">Sign in with Google</a>
+            <a
+              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
+              href="/auth/login"
+            >
+              Sign in with Google
+            </a>
           </div>
         )}
       </main>
