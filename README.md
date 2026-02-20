@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Week 4 - Captions + Images + Voting
 
-## Getting Started
+This app now supports:
+- Google-authenticated users
+- showing **one caption/image at a time** from Supabase
+- submitting **upvote (+1)** or **downvote (-1)** into `caption_votes`
 
-First, run the development server:
+## 1) Why your deploy failed
+
+Your Vercel log showed:
+
+`Can't resolve '@/utils/supabase/server'`
+
+That file/module does not exist in this repo. The app now uses existing local helpers and direct Supabase REST calls, so no `@/utils/supabase/server` import is needed.
+
+## 2) Environment variables
+
+Copy:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then set real values for:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SITE_URL`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Optional schema mapping vars are in `.env.example` for captions/images/votes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 3) Run locally
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open `http://localhost:3000`, then click **Go to protected page (Week 4 form)**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 4) Vote flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Sign in.
+2. You will see one caption card at a time with image (if found).
+3. Click **Upvote (+1)** or **Downvote (-1)**.
+4. App inserts a row into `caption_votes`.
 
-## Deploy on Vercel
+## 5) Supabase checks if inserts fail
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `caption_votes` table/column names match env vars.
+- If your table requires `user_id`, set `CAPTION_VOTES_USER_ID_COLUMN=user_id`.
+- RLS policy allows authenticated insert.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 6) Deploy
+
+Set the same env vars in Vercel Project Settings, redeploy, then test one vote on production.
