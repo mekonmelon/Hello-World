@@ -99,6 +99,7 @@ export async function POST(request: Request) {
     const row: Record<string, string | number> = {
       [captionColumn]: parsed.captionId,
       [voteColumn]: parsed.vote,
+      created_datetime_utc: new Date().toISOString(),
     };
 
     if (userIdColumn) {
