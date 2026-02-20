@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server"; // ADD THIS LINE
 import CaptionVoteForm from "@/components/caption-vote-form";
 
 async function getUserEmail() {
