@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Week 4 - Captions + Images + Voting
 
-## Getting Started
+This version does exactly what you asked:
+- pulls captions/images from Supabase
+- shows one image+caption at a time
+- lets logged-in users upvote (`+1`) or downvote (`-1`)
+- writes votes into `caption_votes`
 
-First, run the development server:
+## Why your deploy was failing
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Your Vercel log error:
+
+`Module not found: Can't resolve '@/utils/supabase/server'`
+
+means your code referenced a file path that doesn't exist in this repo. The app now uses local files under `lib/` and no longer depends on `@/utils/supabase/server`.
+
+---
+
+## Exact environment variables to set
+
+Based on your screenshots, these are the values you should use in **Vercel Project Settings → Environment Variables** and in local `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+NEXT_PUBLIC_SITE_URL=https://YOUR-VERCEL-URL.vercel.app
+
+CAPTIONS_TABLE=captions
+CAPTIONS_ID_COLUMN=id
+CAPTIONS_TEXT_COLUMN=content
+CAPTIONS_PUBLIC_COLUMN=is_public
+CAPTIONS_IMAGE_ID_COLUMN=image_id
+IMAGES_TABLE=images
+IMAGES_ID_COLUMN=uuid
+IMAGES_URL_COLUMN=url
+CAPTIONS_LIMIT=25
+
+CAPTION_VOTES_TABLE=caption_votes
+CAPTION_VOTES_CAPTION_ID_COLUMN=caption_id
+CAPTION_VOTES_VOTE_COLUMN=vote_value
+CAPTION_VOTES_USER_ID_COLUMN=profile_id
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+If your captions table directly stores URL text, also set:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+CAPTIONS_IMAGE_URL_COLUMN=image_url
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+(If not, leave it as-is and image lookup will use `image_id -> images.uuid -> images.url`.)
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Local run checklist
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Copy template:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cp .env.example .env.local
+```
 
-## Deploy on Vercel
+2. Fill real values.
+3. Start app:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm install
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. Open `http://localhost:3000`.
+5. Click **Go to protected page (Week 4 form)**.
+6. Sign in.
+7. Click **Upvote (+1)** or **Downvote (-1)**.
+8. Verify row inserted in `caption_votes` (`vote_value`, `profile_id`, `caption_id`).
+
+---
+
+## If vote insert fails
+
+Check these first:
+- `CAPTION_VOTES_VOTE_COLUMN=vote_value` (your table uses `vote_value`, not `vote`)
+- `CAPTION_VOTES_USER_ID_COLUMN=profile_id`
+- RLS policy allows authenticated inserts
+- `caption_id` type matches (uuid in your screenshots)
+
+---
+
+## Deploy checklist
+
+1. Push code.
+2. In Vercel, set the same env vars for Production/Preview.
+3. Redeploy (env var changes do not apply to old deployments).
+4. Test one vote on deployed app.
+
+## Common Vercel gotchas
+
+- Updating env vars without redeploying keeps old values in the running deployment.
+- Setting env vars only in one environment (for example Preview but not Production).
+- Keeping `NEXT_PUBLIC_SITE_URL` on an old domain after changing Vercel project URL.
+
+## Backward-compatibility note
+
+The vote API prefers `CAPTION_VOTES_VOTE_COLUMN` and still accepts
+`CAPTION_VOTES_SCORE_COLUMN` as a fallback for older setups.
