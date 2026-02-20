@@ -7,90 +7,42 @@ type ApiResponse = {
   error?: string;
 };
 
-export function CaptionVoteForm() {
-  const [captionId, setCaptionId] = useState("");
-  const [score, setScore] = useState("1");
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">(
-    "idle",
-  );
-  const [message, setMessage] = useState("");
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setStatus("saving");
-    setMessage("");
-
-    const response = await fetch("/api/caption-votes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ captionId, score }),
-    });
-
-    const result = (await response.json()) as ApiResponse;
-
-    if (!response.ok) {
-      setStatus("error");
-      setMessage(result.error ?? "Could not submit vote.");
-      return;
-    }
-
-    setStatus("success");
-    setMessage(`Vote inserted: ${JSON.stringify(result.row)}`);
-    setCaptionId("");
-    setScore("1");
-  }
-
+export default function CaptionVoteForm({ caption }) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-      <h2 className="text-xl font-semibold text-white">Rate a caption</h2>
-      <p className="text-sm text-slate-300">
-        This inserts a row into <code>caption_votes</code> using your signed-in session.
-      </p>
+    <div className="border p-4 rounded-lg">
+      {/* Display the Image */}
+      <img 
+        src={caption.images.image_url} 
+        alt="Humor Image" 
+        className="w-full h-auto rounded" 
+      />
+      
+      {/* Display the Caption Text */}
+      <p className="my-4 italic text-lg">"{caption.caption_text}"</p>
 
-      <label className="block text-sm text-slate-200">
-        Caption ID
-        <input
-          type="text"
-          min={1}
-          value={captionId}
-          onChange={(event) => setCaptionId(event.target.value)}
-          className="mt-1 w-full rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-white"
-          placeholder="Example: 42"
-          required
-        />
-      </label>
-
-      <label className="block text-sm text-slate-200">
-        Score (1-5)
-        <input
-          type="number"
-          min={1}
-          max={5}
-          step={1}
-          value={score}
-          onChange={(event) => setScore(event.target.value)}
-          className="mt-1 w-full rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-white"
-          required
-        />
-      </label>
-
-      <button
-        type="submit"
-        disabled={status === "saving"}
-        className="inline-flex items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300 disabled:opacity-60"
-      >
-        {status === "saving" ? "Saving..." : "Submit vote"}
-      </button>
-
-      {message ? (
-        <p
-          className={`text-sm ${status === "error" ? "text-rose-300" : "text-emerald-300"}`}
+      {/* Simplified Voting Form */}
+      <form action="/api/caption-votes" method="POST" className="flex gap-4">
+        {/* Hidden input to pass the ID automatically */}
+        <input type="hidden" name="captionId" value={caption.id} />
+        
+        {/* Upvote Button */}
+        <button 
+          name="score" 
+          value="1" 
+          className="bg-green-500 text-white px-4 py-2 rounded"
         >
-          {message}
-        </p>
-      ) : null}
-    </form>
+          👍 Upvote
+        </button>
+
+        {/* Downvote Button */}
+        <button 
+          name="score" 
+          value="-1" 
+          className="bg-red-500 text-white px-4 py-2 rounded"
+        >
+          👎 Downvote
+        </button>
+      </form>
+    </div>
   );
 }
