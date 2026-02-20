@@ -35,7 +35,10 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-  const captions = email ? await fetchCaptionCards().catch(() => []) : [];
+  const captions = email ? await fetchCaptionCards().catch((err) => { 
+  console.error("SUPABASE ERROR:", err); 
+  return []; 
+}) : [];
 
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
