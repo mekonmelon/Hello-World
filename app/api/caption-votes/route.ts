@@ -90,7 +90,10 @@ export async function POST(request: Request) {
     const tableName = process.env.CAPTION_VOTES_TABLE ?? DEFAULT_TABLE;
     const captionColumn =
       process.env.CAPTION_VOTES_CAPTION_ID_COLUMN ?? DEFAULT_CAPTION_COLUMN;
-    const voteColumn = process.env.CAPTION_VOTES_VOTE_COLUMN ?? DEFAULT_VOTE_COLUMN;
+    const voteColumn =
+      process.env.CAPTION_VOTES_VOTE_COLUMN ??
+      process.env.CAPTION_VOTES_SCORE_COLUMN ??
+      DEFAULT_VOTE_COLUMN;
     const userIdColumn = process.env.CAPTION_VOTES_USER_ID_COLUMN;
 
     const row: Record<string, string | number> = {

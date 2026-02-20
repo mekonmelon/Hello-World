@@ -1,55 +1,93 @@
 # Week 4 - Captions + Images + Voting
 
-This app now supports:
-- Google-authenticated users
-- showing **one caption/image at a time** from Supabase
-- submitting **upvote (+1)** or **downvote (-1)** into `caption_votes`
+This version does exactly what you asked:
+- pulls captions/images from Supabase
+- shows one image+caption at a time
+- lets logged-in users upvote (`+1`) or downvote (`-1`)
+- writes votes into `caption_votes`
 
-## 1) Why your deploy failed
+## Why your deploy was failing
 
-Your Vercel log showed:
+Your Vercel log error:
 
-`Can't resolve '@/utils/supabase/server'`
+`Module not found: Can't resolve '@/utils/supabase/server'`
 
-That file/module does not exist in this repo. The app now uses existing local helpers and direct Supabase REST calls, so no `@/utils/supabase/server` import is needed.
+means your code referenced a file path that doesn't exist in this repo. The app now uses local files under `lib/` and no longer depends on `@/utils/supabase/server`.
 
-## 2) Environment variables
+---
 
-Copy:
+## Exact environment variables to set
+
+Based on your screenshots, these are the values you should use in **Vercel Project Settings → Environment Variables** and in local `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+NEXT_PUBLIC_SITE_URL=https://YOUR-VERCEL-URL.vercel.app
+
+CAPTIONS_TABLE=captions
+CAPTIONS_ID_COLUMN=id
+CAPTIONS_TEXT_COLUMN=content
+CAPTIONS_PUBLIC_COLUMN=is_public
+CAPTIONS_IMAGE_ID_COLUMN=image_id
+IMAGES_TABLE=images
+IMAGES_ID_COLUMN=uuid
+IMAGES_URL_COLUMN=url
+CAPTIONS_LIMIT=25
+
+CAPTION_VOTES_TABLE=caption_votes
+CAPTION_VOTES_CAPTION_ID_COLUMN=caption_id
+CAPTION_VOTES_VOTE_COLUMN=vote_value
+CAPTION_VOTES_USER_ID_COLUMN=profile_id
+```
+
+If your captions table directly stores URL text, also set:
+
+```env
+CAPTIONS_IMAGE_URL_COLUMN=image_url
+```
+
+(If not, leave it as-is and image lookup will use `image_id -> images.uuid -> images.url`.)
+
+---
+
+## Local run checklist
+
+1. Copy template:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Then set real values for:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_SITE_URL`
-
-Optional schema mapping vars are in `.env.example` for captions/images/votes.
-
-## 3) Run locally
+2. Fill real values.
+3. Start app:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`, then click **Go to protected page (Week 4 form)**.
+4. Open `http://localhost:3000`.
+5. Click **Go to protected page (Week 4 form)**.
+6. Sign in.
+7. Click **Upvote (+1)** or **Downvote (-1)**.
+8. Verify row inserted in `caption_votes` (`vote_value`, `profile_id`, `caption_id`).
 
-## 4) Vote flow
+---
 
-1. Sign in.
-2. You will see one caption card at a time with image (if found).
-3. Click **Upvote (+1)** or **Downvote (-1)**.
-4. App inserts a row into `caption_votes`.
+## If vote insert fails
 
-## 5) Supabase checks if inserts fail
+Check these first:
+- `CAPTION_VOTES_VOTE_COLUMN=vote_value` (your table uses `vote_value`, not `vote`)
+- `CAPTION_VOTES_USER_ID_COLUMN=profile_id`
+- RLS policy allows authenticated inserts
+- `caption_id` type matches (uuid in your screenshots)
 
-- `caption_votes` table/column names match env vars.
-- If your table requires `user_id`, set `CAPTION_VOTES_USER_ID_COLUMN=user_id`.
-- RLS policy allows authenticated insert.
+---
 
-## 6) Deploy
+## Deploy checklist
 
-Set the same env vars in Vercel Project Settings, redeploy, then test one vote on production.
+1. Push code.
+2. In Vercel, set the same env vars for Production/Preview.
+3. Redeploy.
+4. Test one vote on deployed app.
