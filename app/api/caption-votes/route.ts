@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       row[userIdColumn] = userId;
     }
 
-    const endpoint = new URL(`/rest/v1/${tableName}`, supabaseUrl);
+    const endpoint = new URL(`/rest/v1/${tableName}?on_conflict=${userIdColumn},${captionColumn}`, supabaseUrl);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         apikey: anonKey,
         Authorization: `Bearer ${accessToken}`,
-        Prefer: "return=representation",
+        Prefer: "return=representation,resolution=merge-duplicates",
       },
       body: JSON.stringify([row]),
     });
