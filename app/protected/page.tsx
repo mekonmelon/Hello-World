@@ -34,42 +34,44 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-
+  
+  const { data: captions } = await supabase
+    .from('captions')
+    .select(`
+      id,
+      caption_text,
+      images (image_url)
+    `)
+    .limit(1)
+    .single(); // Use .single() to get one object instead of an array
+  
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
         <header className="space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
-            Assignment 4
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Assignment 4</p>
           <h1 className="text-4xl font-semibold">Mutating Data</h1>
         </header>
 
         {email ? (
           <div className="space-y-5 text-slate-200">
-            <p>
-              You are signed in as <span className="font-semibold text-white">{email}</span>.
-            </p>
-            <p>Submit votes below to insert rows into your caption_votes table.</p>
+            <p>You are signed in as <span className="font-semibold text-white">{email}</span>.</p>
+            
+            {/* 3. Pass the fetched caption data into your form component */}
             <section id="rate-caption">
-              <CaptionVoteForm />
+              {captions ? (
+                <CaptionVoteForm caption={captions} />
+              ) : (
+                <p>Loading caption...</p>
+              )}
             </section>
-            <a
-              className="inline-flex w-fit items-center justify-center rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-              href="/auth/logout"
-            >
-              Sign out
-            </a>
+
+            <a className="inline-flex ... " href="/auth/logout">Sign out</a>
           </div>
         ) : (
           <div className="space-y-3 text-slate-200">
             <p>{error ?? "You must sign in to view this page."}</p>
-            <a
-              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
-              href="/auth/login"
-            >
-              Sign in with Google
-            </a>
+            <a className="inline-flex ... " href="/auth/login">Sign in with Google</a>
           </div>
         )}
       </main>
