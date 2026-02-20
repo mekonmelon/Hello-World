@@ -89,5 +89,16 @@ Check these first:
 
 1. Push code.
 2. In Vercel, set the same env vars for Production/Preview.
-3. Redeploy.
+3. Redeploy (env var changes do not apply to old deployments).
 4. Test one vote on deployed app.
+
+## Common Vercel gotchas
+
+- Updating env vars without redeploying keeps old values in the running deployment.
+- Setting env vars only in one environment (for example Preview but not Production).
+- Keeping `NEXT_PUBLIC_SITE_URL` on an old domain after changing Vercel project URL.
+
+## Backward-compatibility note
+
+The vote API prefers `CAPTION_VOTES_VOTE_COLUMN` and still accepts
+`CAPTION_VOTES_SCORE_COLUMN` as a fallback for older setups.
