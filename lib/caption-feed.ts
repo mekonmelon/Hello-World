@@ -63,7 +63,7 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
   captionsEndpoint.searchParams.set(
     "select",
-    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn},${captionImageUrlColumn}`,
+    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn}`,
   );
   captionsEndpoint.searchParams.set(
     "limit",
