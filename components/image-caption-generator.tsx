@@ -2,7 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type CaptionItem = string | number | boolean | Record<string, unknown> | null;
+type CaptionItem = {
+  id: string;
+  content: string;
+  // you can add other fields like created_datetime_utc here later if needed, 
+  // but these two are all we need for the UI!
+};
 
 type GenerateCaptionsResponse = {
   imageId?: string;
@@ -122,11 +127,11 @@ export default function ImageCaptionGenerator() {
         <div className="space-y-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Captions</h3>
           <ul className="list-disc space-y-1 pl-5 text-slate-200">
-            {captions.map((caption, index) => (
-              <li key={`${index}-${typeof caption === "string" ? caption : "caption"}`}>
-                {typeof caption === "string" ? caption : JSON.stringify(caption)}
+            {captions.map((caption) => (
+              <li key={caption.id}>
+                {caption.content}
               </li>
-            ))}
+          ))}
           </ul>
         </div>
       ) : null}
