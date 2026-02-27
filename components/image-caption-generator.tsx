@@ -2,28 +2,32 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type GenerateResponse = {
+type CaptionItem = string | number | boolean | Record<string, unknown> | null;
+
+type GenerateCaptionsResponse = {
   imageId?: string;
-  captions?: Array<{ id?: string; content?: string; [key: string]: unknown }>;
-  raw?: unknown;
+  captions?: CaptionItem[];
   error?: string;
 };
 
-const SUPPORTED_TYPES = [
+const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
-  "image/heic",
-];
+] as const;
 
 export default function ImageCaptionGenerator() {
-  const [file, setFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
-  const [result, setResult] = useState<GenerateResponse | null>(null);
+  const [message, setMessage] = useState<string>("");
+  const [imageId, setImageId] = useState<string | null>(null);
+  const [captions, setCaptions] = useState<CaptionItem[]>([]);
 
-  const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const previewUrl = useMemo(
+    () => (selectedFile ? URL.createObjectURL(selectedFile) : null),
+    [selectedFile],
+  );
 
   useEffect(() => {
     return () => {
@@ -33,34 +37,35 @@ export default function ImageCaptionGenerator() {
     };
   }, [previewUrl]);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!file) {
+    if (!selectedFile) {
       setStatus("error");
-      setMessage("Please choose an image first.");
+      setMessage("Please choose an image file first.");
       return;
     }
 
-    if (!SUPPORTED_TYPES.includes(file.type)) {
+    if (!ALLOWED_IMAGE_TYPES.includes(selectedFile.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
       setStatus("error");
-      setMessage(`Unsupported file type: ${file.type || "unknown"}`);
+      setMessage("Unsupported file type. Please upload JPEG, PNG, WEBP, or GIF.");
       return;
     }
-
-    const body = new FormData();
-    body.append("image", file);
 
     setStatus("loading");
     setMessage("Uploading image and generating captions...");
-    setResult(null);
+    setImageId(null);
+    setCaptions([]);
+
+    const formData = new FormData();
+    formData.append("image", selectedFile);
 
     const response = await fetch("/api/generate-captions", {
       method: "POST",
-      body,
+      body: formData,
     });
 
-    const payload = (await response.json()) as GenerateResponse;
+    const payload = (await response.json()) as GenerateCaptionsResponse;
 
     if (!response.ok) {
       setStatus("error");
@@ -69,22 +74,21 @@ export default function ImageCaptionGenerator() {
     }
 
     setStatus("success");
-    setMessage("Caption generation complete.");
-    setResult(payload);
+    setMessage("Captions generated successfully.");
+    setImageId(payload.imageId ?? null);
+    setCaptions(Array.isArray(payload.captions) ? payload.captions : []);
   }
 
   return (
     <section className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-      <h2 className="text-xl font-semibold text-white">Upload image + generate captions</h2>
-      <p className="text-sm text-slate-300">
-        Supports jpeg, png, webp, gif, and heic. This runs all 4 API steps for you.
-      </p>
+      <h2 className="text-xl font-semibold text-white">Image Caption Generator</h2>
+      <p className="text-sm text-slate-300">Upload an image to generate captions through the REST pipeline.</p>
 
-      <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
+      <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <input
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,image/heic"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
           className="block w-full rounded-lg border border-white/20 bg-slate-900/80 px-3 py-2 text-sm text-slate-100"
         />
 
@@ -93,7 +97,7 @@ export default function ImageCaptionGenerator() {
           disabled={status === "loading"}
           className="rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === "loading" ? "Generating..." : "Generate caption"}
+          {status === "loading" ? "Generating..." : "Generate Captions"}
         </button>
       </form>
 
@@ -101,7 +105,7 @@ export default function ImageCaptionGenerator() {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={previewUrl}
-          alt="Selected upload preview"
+          alt="Selected image preview"
           className="max-h-80 w-full rounded-xl border border-white/10 object-contain"
         />
       ) : null}
@@ -112,20 +116,20 @@ export default function ImageCaptionGenerator() {
         </p>
       ) : null}
 
-      {result?.captions?.length ? (
+      {imageId ? <p className="text-xs text-slate-300">imageId: {imageId}</p> : null}
+
+      {captions.length > 0 ? (
         <div className="space-y-2">
-          <h3 className="font-semibold text-white">Generated captions</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Captions</h3>
           <ul className="list-disc space-y-1 pl-5 text-slate-200">
-            {result.captions.map((caption, index) => (
-              <li key={caption.id ?? `${index}-${String(caption.content ?? "caption")}`}>
-                {caption.content ?? JSON.stringify(caption)}
+            {captions.map((caption, index) => (
+              <li key={`${index}-${typeof caption === "string" ? caption : "caption"}`}>
+                {typeof caption === "string" ? caption : JSON.stringify(caption)}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-
-      {result?.imageId ? <p className="text-xs text-slate-400">Image ID: {result.imageId}</p> : null}
     </section>
   );
 }
