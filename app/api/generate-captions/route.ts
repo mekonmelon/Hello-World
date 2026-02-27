@@ -2,18 +2,17 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 type PresignedUrlResponse = {
-  presignedUrl: string;
-  cdnUrl: string;
+  presignedUrl?: string;
+  cdnUrl?: string;
 };
 
 type RegisterImageResponse = {
-  imageId: string;
+  imageId?: string;
 };
 
 const API_BASE = "https://api.almostcrackd.ai";
 const SUPPORTED_TYPES = new Set([
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",
@@ -27,12 +26,41 @@ function buildHeaders(token: string) {
   };
 }
 
+async function validateSupabaseAccessToken(accessToken: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    return { valid: false, error: "Missing Supabase environment variables.", status: 500 };
+  }
+
+  const response = await fetch(new URL("/auth/v1/user", supabaseUrl), {
+    method: "GET",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return { valid: false, error: "Session expired. Please sign in again.", status: 401 };
+  }
+
+  return { valid: true as const };
+}
+
 export async function POST(request: Request) {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("sb-access-token")?.value;
 
   if (!accessToken) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const tokenValidation = await validateSupabaseAccessToken(accessToken);
+  if (!tokenValidation.valid) {
+    return NextResponse.json({ error: tokenValidation.error }, { status: tokenValidation.status });
   }
 
   const formData = await request.formData();
@@ -66,6 +94,9 @@ export async function POST(request: Request) {
     }
 
     const { presignedUrl, cdnUrl } = (await step1.json()) as PresignedUrlResponse;
+    if (!presignedUrl || !cdnUrl) {
+      return NextResponse.json({ error: "Step 1 failed: missing presignedUrl/cdnUrl." }, { status: 502 });
+    }
 
     const uploadResponse = await fetch(presignedUrl, {
       method: "PUT",
@@ -100,6 +131,9 @@ export async function POST(request: Request) {
     }
 
     const { imageId } = (await step3.json()) as RegisterImageResponse;
+    if (!imageId) {
+      return NextResponse.json({ error: "Step 3 failed: missing imageId." }, { status: 502 });
+    }
 
     const step4 = await fetch(`${API_BASE}/pipeline/generate-captions`, {
       method: "POST",
@@ -116,13 +150,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const captionsPayload = (await step4.json()) as unknown;
+    const captions = (await step4.json()) as unknown;
 
-    const captions = Array.isArray(captionsPayload)
-      ? captionsPayload.filter((item): item is Record<string, unknown> => Boolean(item))
-      : [];
-
-    return NextResponse.json({ imageId, captions, raw: captionsPayload });
+    return NextResponse.json({ imageId, captions });
   } catch (error) {
     return NextResponse.json(
       {

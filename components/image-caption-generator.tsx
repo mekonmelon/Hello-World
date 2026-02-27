@@ -11,7 +11,6 @@ type GenerateResponse = {
 
 const SUPPORTED_TYPES = [
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",
@@ -78,13 +77,13 @@ export default function ImageCaptionGenerator() {
     <section className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
       <h2 className="text-xl font-semibold text-white">Upload image + generate captions</h2>
       <p className="text-sm text-slate-300">
-        Supports jpeg, jpg, png, webp, gif, and heic. This runs all 4 API steps for you.
+        Supports jpeg, png, webp, gif, and heic. This runs all 4 API steps for you.
       </p>
 
       <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
         <input
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/heic"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           className="block w-full rounded-lg border border-white/20 bg-slate-900/80 px-3 py-2 text-sm text-slate-100"
         />
