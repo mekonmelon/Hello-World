@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import CaptionVoteForm from "@/components/caption-vote-form";
+import ImageCaptionGenerator from "@/components/image-caption-generator";
 import { fetchCaptionCards } from "@/lib/caption-feed";
 
 async function getUserEmail() {
@@ -35,19 +36,21 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-  const captions = email ? await fetchCaptionCards().catch((err) => { 
-  console.error("SUPABASE ERROR:", err); 
-  return []; 
-}) : [];
+  const captions = email
+    ? await fetchCaptionCards().catch((err) => {
+        console.error("SUPABASE ERROR:", err);
+        return [];
+      })
+    : [];
 
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
         <header className="space-y-3">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
-            Assignment 4
+            Assignment 5
           </p>
-          <h1 className="text-4xl font-semibold">Mutating Data</h1>
+          <h1 className="text-4xl font-semibold">REST API Captions + Voting</h1>
         </header>
 
         {email ? (
@@ -55,7 +58,10 @@ export default async function ProtectedPage() {
             <p>
               You are signed in as <span className="font-semibold text-white">{email}</span>.
             </p>
-            <p>Vote on one caption at a time. Each click inserts +1 or -1 in caption_votes.</p>
+            <p>Upload an image to generate captions, then vote on one caption at a time.</p>
+            <section id="generate-caption" className="space-y-2">
+              <ImageCaptionGenerator />
+            </section>
             <section id="rate-caption">
               <CaptionVoteForm captions={captions} />
             </section>
