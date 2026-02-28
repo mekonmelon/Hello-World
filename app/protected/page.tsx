@@ -81,7 +81,7 @@ export default async function ProtectedPage() {
             </div>
 
             <section id="generate-caption" className="space-y-2">
-              <ImageCaptionGenerator />
+              <ImageCaptionGenerator canVote={Boolean(email)} />
             </section>
 
             <section id="rate-caption" className="space-y-2">

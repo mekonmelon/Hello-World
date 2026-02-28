@@ -24,7 +24,11 @@ const ALLOWED_IMAGE_TYPES = [
   "image/gif",
 ] as const;
 
-export default function ImageCaptionGenerator() {
+type Props = {
+  canVote?: boolean;
+};
+
+export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string>("");
@@ -47,6 +51,12 @@ export default function ImageCaptionGenerator() {
   }, [previewUrl]);
 
   async function submitVote(captionId: string | number | undefined, vote: 1 | -1) {
+    if (!canVote) {
+      setVoteStatus("error");
+      setVoteMessage("You must sign in to vote on captions.");
+      return;
+    }
+
     if (!captionId) {
       setVoteStatus("error");
       setVoteMessage("This generated caption has no ID yet, so it cannot be voted on.");
@@ -199,7 +209,7 @@ export default function ImageCaptionGenerator() {
                   <button
                     type="button"
                     onClick={() => void submitVote(caption.id, 1)}
-                    disabled={voteStatus === "saving" || !caption.id}
+                    disabled={voteStatus === "saving" || !caption.id || !canVote}
                     className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
                   >
                     Upvote (+1)
@@ -207,12 +217,17 @@ export default function ImageCaptionGenerator() {
                   <button
                     type="button"
                     onClick={() => void submitVote(caption.id, -1)}
-                    disabled={voteStatus === "saving" || !caption.id}
+                    disabled={voteStatus === "saving" || !caption.id || !canVote}
                     className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
                   >
                     Downvote (-1)
                   </button>
                 </div>
+
+
+                {!canVote ? (
+                  <p className="text-xs text-amber-300">Sign in is required to vote on generated captions.</p>
+                ) : null}
 
                 {!caption.id ? (
                   <p className="text-xs text-amber-300">
