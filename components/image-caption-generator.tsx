@@ -51,6 +51,8 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     };
   }, [previewUrl]);
 
+  const currentCaption = generatedCaptions[currentCaptionIndex] ?? null;
+
   async function submitVote(captionId: string | number | undefined, vote: 1 | -1) {
     if (!canVote) {
       setVoteStatus("error");
@@ -175,79 +177,74 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
 
       {imageId ? <p className="text-xs text-slate-300">imageId: {imageId}</p> : null}
 
-      {generatedCaptions.length > 0 ? (
+      {currentCaption ? (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated captions</h3>
-          <p className="text-xs text-slate-400">Current caption index: {currentCaptionIndex}</p>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated caption</h3>
+          <p className="text-xs text-slate-400">
+            Caption {currentCaptionIndex + 1} of {generatedCaptions.length}
+          </p>
 
-          {generatedCaptions.map((caption, index) => {
-            const captionText =
-              typeof caption.content === "string"
-                ? caption.content
-                : typeof caption.caption === "string"
-                  ? caption.caption
-                  : JSON.stringify(caption);
-            const cardImageUrl =
-              typeof caption.imageUrl === "string"
-                ? caption.imageUrl
-                : typeof caption.url === "string"
-                  ? caption.url
-                  : previewUrl;
+          <article className="space-y-3 rounded-xl border border-white/10 bg-slate-900/70 p-4">
+            {(typeof currentCaption.imageUrl === "string"
+              ? currentCaption.imageUrl
+              : typeof currentCaption.url === "string"
+                ? currentCaption.url
+                : previewUrl) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={
+                  typeof currentCaption.imageUrl === "string"
+                    ? currentCaption.imageUrl
+                    : typeof currentCaption.url === "string"
+                      ? currentCaption.url
+                      : previewUrl ?? ""
+                }
+                alt="Generated caption image"
+                className="mx-auto max-h-[400px] w-full max-w-md rounded-lg border border-white/10 object-contain"
+              />
+            ) : null}
 
-            return (
-              <article
-                key={caption.id ? String(caption.id) : `generated-caption-${index}`}
-                className="space-y-3 rounded-xl border border-white/10 bg-slate-900/70 p-4"
+            <p className="rounded-lg bg-slate-950/70 p-3 text-slate-100">
+              {typeof currentCaption.content === "string"
+                ? currentCaption.content
+                : typeof currentCaption.caption === "string"
+                  ? currentCaption.caption
+                  : JSON.stringify(currentCaption)}
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void submitVote(currentCaption.id, 1);
+                }}
+                disabled={voteStatus === "saving" || !currentCaption.id || !canVote}
+                className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
               >
-                {cardImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={cardImageUrl}
-                    alt="Generated caption image"
-                    className="w-full rounded-lg border border-white/10 object-contain"
-                  />
-                ) : null}
+                Upvote (+1)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void submitVote(currentCaption.id, -1);
+                }}
+                disabled={voteStatus === "saving" || !currentCaption.id || !canVote}
+                className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
+              >
+                Downvote (-1)
+              </button>
+            </div>
 
-                <p className="rounded-lg bg-slate-950/70 p-3 text-slate-100">{captionText}</p>
+            {!canVote ? (
+              <p className="text-xs text-amber-300">Sign in is required to vote on generated captions.</p>
+            ) : null}
 
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentCaptionIndex(index);
-                      void submitVote(caption.id, 1);
-                    }}
-                    disabled={voteStatus === "saving" || !caption.id || !canVote}
-                    className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
-                  >
-                    Upvote (+1)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentCaptionIndex(index);
-                      void submitVote(caption.id, -1);
-                    }}
-                    disabled={voteStatus === "saving" || !caption.id || !canVote}
-                    className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
-                  >
-                    Downvote (-1)
-                  </button>
-                </div>
-
-
-                {!canVote ? (
-                  <p className="text-xs text-amber-300">Sign in is required to vote on generated captions.</p>
-                ) : null}
-
-                {!caption.id ? (
-                  <p className="text-xs text-amber-300">
-                    This caption record is missing an ID, so voting is disabled for this item.
-                  </p>
-                ) : null}
-              </article>
-            );
-          })}
+            {!currentCaption.id ? (
+              <p className="text-xs text-amber-300">
+                This caption record is missing an ID, so voting is disabled for this item.
+              </p>
+            ) : null}
+          </article>
         </div>
       ) : null}
 
