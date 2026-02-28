@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CaptionCard } from "@/lib/caption-feed";
 
 type ApiResponse = {
@@ -8,21 +8,80 @@ type ApiResponse = {
   error?: string;
 };
 
-type Props = {
-  captions: CaptionCard[];
+type RandomCaptionResponse = {
+  caption?: CaptionCard | null;
+  error?: string;
 };
 
-export default function CaptionVoteForm({ captions }: Props) {
-  const [index, setIndex] = useState(0);
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">(
-    "idle",
+async function fetchRandomCaption() {
+  const response = await fetch("/api/captions/random", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  const result = (await response.json()) as RandomCaptionResponse;
+
+  if (!response.ok) {
+    throw new Error(result.error ?? "Could not load a caption.");
+  }
+
+  return result.caption ?? null;
+}
+
+export default function CaptionVoteForm() {
+  const [currentCaption, setCurrentCaption] = useState<CaptionCard | null>(null);
+  const [status, setStatus] = useState<"loading" | "idle" | "saving" | "success" | "error">(
+    "loading",
   );
   const [message, setMessage] = useState("");
 
-  const current = captions[index] ?? null;
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialCaption() {
+      try {
+        const caption = await fetchRandomCaption();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCurrentCaption(caption);
+        setStatus("idle");
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStatus("error");
+        setMessage(error instanceof Error ? error.message : "Could not load a caption.");
+      }
+    }
+
+    void loadInitialCaption();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function loadNextRandomCaption() {
+    setStatus("loading");
+    setMessage("");
+
+    try {
+      const caption = await fetchRandomCaption();
+      setCurrentCaption(caption);
+      setStatus("idle");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not load a caption.");
+    }
+  }
 
   async function submitVote(vote: 1 | -1) {
-    if (!current) {
+    if (!currentCaption) {
       return;
     }
 
@@ -34,7 +93,8 @@ export default function CaptionVoteForm({ captions }: Props) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ captionId: current.id, vote: String(vote) }),
+      credentials: "include",
+      body: JSON.stringify({ captionId: currentCaption.id, vote: String(vote) }),
     });
 
     const result = (await response.json()) as ApiResponse;
@@ -46,14 +106,19 @@ export default function CaptionVoteForm({ captions }: Props) {
     }
 
     setStatus("success");
-    setMessage(`Vote saved for caption ${current.id}.`);
-
-    if (captions.length > 1) {
-      setIndex((prev) => (prev + 1) % captions.length);
-    }
+    setMessage(`Vote saved for caption ${currentCaption.id}.`);
+    await loadNextRandomCaption();
   }
 
-  if (!current) {
+  if (status === "loading" && !currentCaption) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-slate-200">
+        Loading a random caption...
+      </div>
+    );
+  }
+
+  if (!currentCaption) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-slate-200">
         No captions found. Set the captions/images env vars and verify data exists.
@@ -64,14 +129,12 @@ export default function CaptionVoteForm({ captions }: Props) {
   return (
     <section className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
       <h2 className="text-xl font-semibold text-white">Rate this caption</h2>
-      <p className="text-sm text-slate-300">
-        Caption {index + 1} of {captions.length}
-      </p>
+      <p className="text-sm text-slate-300">This card is randomly selected from your Supabase dataset.</p>
 
-      {current.imageUrl ? (
+      {currentCaption.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={current.imageUrl}
+          src={currentCaption.imageUrl}
           alt="Caption candidate"
           className="w-full rounded-xl border border-white/10 object-cover"
         />
@@ -81,13 +144,13 @@ export default function CaptionVoteForm({ captions }: Props) {
         </div>
       )}
 
-      <p className="rounded-lg bg-slate-900/80 p-4 text-slate-100">{current.text}</p>
+      <p className="rounded-lg bg-slate-900/80 p-4 text-slate-100">{currentCaption.text}</p>
 
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={() => void submitVote(1)}
-          disabled={status === "saving"}
+          disabled={status === "saving" || status === "loading"}
           className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
         >
           Upvote (+1)
@@ -95,7 +158,7 @@ export default function CaptionVoteForm({ captions }: Props) {
         <button
           type="button"
           onClick={() => void submitVote(-1)}
-          disabled={status === "saving"}
+          disabled={status === "saving" || status === "loading"}
           className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
         >
           Downvote (-1)
