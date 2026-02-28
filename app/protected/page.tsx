@@ -35,70 +35,41 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
+
   return (
-    <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-12 text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-28 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+      </div>
+
+      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-[2rem] border border-white/10 bg-slate-900/55 p-6 shadow-[0_30px_100px_-40px_rgba(14,165,233,0.65)] backdrop-blur-xl sm:p-10">
         <header className="space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
-            Assignment 5
-          </p>
-          <h1 className="text-4xl font-semibold">Upload Images, Generate Captions, Then Vote</h1>
-          <p className="text-slate-300">
-            Complete the new image upload + caption generation flow first, then use the existing
-            caption voting UI below.
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Create Captions. Shape the Feed.</h1>
+          <p className="max-w-2xl text-slate-300">
+            Generate caption ideas from your images, then keep the community feed sharp by voting on the best lines.
           </p>
         </header>
 
         {email ? (
-          <div className="space-y-6 text-slate-200">
-            <p>
-              You are signed in as <span className="font-semibold text-white">{email}</span>.
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <a
-                href="#generate-caption"
-                className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm transition hover:bg-white/10"
-              >
-                <p className="font-semibold text-white">Step 1: Upload image + generate captions</p>
-                <p className="mt-1 text-slate-300">Use the new generator to run the REST pipeline.</p>
-              </a>
-              <a
-                href="#rate-caption"
-                className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm transition hover:bg-white/10"
-              >
-                <p className="font-semibold text-white">Step 2: Vote on caption quality</p>
-                <p className="mt-1 text-slate-300">Continue with your existing caption voting workflow.</p>
-              </a>
-            </div>
-
-            <section id="generate-caption" className="space-y-2">
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section id="generate-caption" className="xl:col-span-1">
               <ImageCaptionGenerator canVote={Boolean(email)} />
             </section>
 
-            <section id="rate-caption" className="space-y-2">
-              <h2 className="text-2xl font-semibold text-white">Caption voting</h2>
-              <p className="text-sm text-slate-300">
-                After generating captions, you can still vote on one caption at a time.
-              </p>
+            <section id="rate-caption" className="xl:col-span-1">
               <CaptionVoteForm />
             </section>
-
-            <a
-              className="inline-flex w-fit items-center justify-center rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-              href="/auth/logout"
-            >
-              Sign out
-            </a>
           </div>
         ) : (
-          <div className="space-y-3 text-slate-200">
+          <div className="space-y-3 rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-xl">
             <p>{error ?? "You must sign in to upload images, generate captions, and vote."}</p>
             <a
-              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
+              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition duration-300 hover:-translate-y-0.5 hover:bg-sky-300"
               href="/auth/login"
             >
-              Sign in with Google to start uploading
+              Sign in with Google to continue
             </a>
           </div>
         )}
