@@ -34,6 +34,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [message, setMessage] = useState<string>("");
   const [imageId, setImageId] = useState<string | null>(null);
   const [generatedCaptions, setGeneratedCaptions] = useState<CaptionRecord[]>([]);
+  const [currentCaptionIndex, setCurrentCaptionIndex] = useState(0);
   const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [voteMessage, setVoteMessage] = useState<string>("");
 
@@ -106,6 +107,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     setMessage("Uploading image and generating captions...");
     setImageId(null);
     setGeneratedCaptions([]);
+    setCurrentCaptionIndex(0);
     setVoteStatus("idle");
     setVoteMessage("");
 
@@ -129,7 +131,9 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     setStatus("success");
     setMessage("Captions generated successfully.");
     setImageId(payload.imageId ?? null);
-    setGeneratedCaptions(Array.isArray(payload.captions) ? payload.captions : []);
+    const nextCaptions = Array.isArray(payload.captions) ? payload.captions : [];
+    setGeneratedCaptions(nextCaptions);
+    setCurrentCaptionIndex(0);
   }
 
   return (
@@ -159,7 +163,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         <img
           src={previewUrl}
           alt="Selected image preview"
-          className="max-h-80 w-full rounded-xl border border-white/10 object-contain"
+          className="mx-auto max-h-[400px] w-full max-w-md rounded-xl border border-white/10 object-contain"
         />
       ) : null}
 
@@ -174,6 +178,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
       {generatedCaptions.length > 0 ? (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated captions</h3>
+          <p className="text-xs text-slate-400">Current caption index: {currentCaptionIndex}</p>
 
           {generatedCaptions.map((caption, index) => {
             const captionText =
@@ -208,7 +213,10 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
-                    onClick={() => void submitVote(caption.id, 1)}
+                    onClick={() => {
+                      setCurrentCaptionIndex(index);
+                      void submitVote(caption.id, 1);
+                    }}
                     disabled={voteStatus === "saving" || !caption.id || !canVote}
                     className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
                   >
@@ -216,7 +224,10 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void submitVote(caption.id, -1)}
+                    onClick={() => {
+                      setCurrentCaptionIndex(index);
+                      void submitVote(caption.id, -1);
+                    }}
                     disabled={voteStatus === "saving" || !caption.id || !canVote}
                     className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
                   >
