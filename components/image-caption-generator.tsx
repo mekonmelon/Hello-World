@@ -35,7 +35,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [imageId, setImageId] = useState<string | null>(null);
   const [generatedCaptions, setGeneratedCaptions] = useState<CaptionRecord[]>([]);
   const [currentCaptionIndex, setCurrentCaptionIndex] = useState(0);
-  const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "error">("idle");
   const [voteMessage, setVoteMessage] = useState<string>("");
 
   const previewUrl = useMemo(
@@ -86,8 +86,9 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
       return;
     }
 
-    setVoteStatus("success");
-    setVoteMessage(`Vote saved for caption ${captionId}.`);
+    setVoteStatus("idle");
+    setVoteMessage("");
+    setCurrentCaptionIndex((previousIndex) => previousIndex + 1);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -248,11 +249,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         </div>
       ) : null}
 
-      {voteMessage ? (
-        <p className={`text-sm ${voteStatus === "error" ? "text-rose-300" : "text-emerald-300"}`}>
-          {voteMessage}
-        </p>
-      ) : null}
+      {voteStatus === "error" && voteMessage ? <p className="text-sm text-rose-300">{voteMessage}</p> : null}
     </section>
   );
 }
