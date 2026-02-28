@@ -61,7 +61,8 @@ export default function ImageCaptionGenerator() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ captionId: String(captionId), vote: String(vote) }),
+      credentials: "include",
+      body: JSON.stringify({ captionId: String(captionId), vote }),
     });
 
     const result = (await response.json()) as { error?: string };
@@ -103,6 +104,7 @@ export default function ImageCaptionGenerator() {
 
     const response = await fetch("/api/generate-captions", {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
 
