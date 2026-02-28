@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import CaptionVoteForm from "@/components/caption-vote-form";
 import ImageCaptionGenerator from "@/components/image-caption-generator";
-import { fetchCaptionCards } from "@/lib/caption-feed";
 
 async function getUserEmail() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,13 +35,6 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-  const captions = email
-    ? await fetchCaptionCards().catch((err) => {
-        console.error("SUPABASE ERROR:", err);
-        return [];
-      })
-    : [];
-
   return (
     <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
@@ -89,7 +81,7 @@ export default async function ProtectedPage() {
               <p className="text-sm text-slate-300">
                 After generating captions, you can still vote on one caption at a time.
               </p>
-              <CaptionVoteForm captions={captions} />
+              <CaptionVoteForm />
             </section>
 
             <a
