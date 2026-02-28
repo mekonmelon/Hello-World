@@ -2,11 +2,18 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type CaptionItem = string | number | boolean | Record<string, unknown> | null;
+type CaptionRecord = {
+  id?: string | number;
+  content?: string;
+  caption?: string;
+  imageUrl?: string;
+  url?: string;
+  [key: string]: unknown;
+};
 
 type GenerateCaptionsResponse = {
   imageId?: string;
-  captions?: CaptionItem[];
+  captions?: CaptionRecord[];
   error?: string;
 };
 
@@ -22,7 +29,9 @@ export default function ImageCaptionGenerator() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string>("");
   const [imageId, setImageId] = useState<string | null>(null);
-  const [generatedCaptions, setGeneratedCaptions] = useState<CaptionItem[]>([]);
+  const [generatedCaptions, setGeneratedCaptions] = useState<CaptionRecord[]>([]);
+  const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [voteMessage, setVoteMessage] = useState<string>("");
 
   const previewUrl = useMemo(
     () => (selectedFile ? URL.createObjectURL(selectedFile) : null),
@@ -36,6 +45,36 @@ export default function ImageCaptionGenerator() {
       }
     };
   }, [previewUrl]);
+
+  async function submitVote(captionId: string | number | undefined, vote: 1 | -1) {
+    if (!captionId) {
+      setVoteStatus("error");
+      setVoteMessage("This generated caption has no ID yet, so it cannot be voted on.");
+      return;
+    }
+
+    setVoteStatus("saving");
+    setVoteMessage("");
+
+    const response = await fetch("/api/caption-votes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ captionId: String(captionId), vote: String(vote) }),
+    });
+
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setVoteStatus("error");
+      setVoteMessage(result.error ?? "Could not submit vote.");
+      return;
+    }
+
+    setVoteStatus("success");
+    setVoteMessage(`Vote saved for caption ${captionId}.`);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +95,8 @@ export default function ImageCaptionGenerator() {
     setMessage("Uploading image and generating captions...");
     setImageId(null);
     setGeneratedCaptions([]);
+    setVoteStatus("idle");
+    setVoteMessage("");
 
     const formData = new FormData();
     formData.append("image", selectedFile);
@@ -119,16 +160,73 @@ export default function ImageCaptionGenerator() {
       {imageId ? <p className="text-xs text-slate-300">imageId: {imageId}</p> : null}
 
       {generatedCaptions.length > 0 ? (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Captions</h3>
-          <ul className="list-disc space-y-1 pl-5 text-slate-200">
-            {generatedCaptions.map((caption, index) => (
-              <li key={`${index}-${typeof caption === "string" ? caption : "caption"}`}>
-                {typeof caption === "string" ? caption : JSON.stringify(caption)}
-              </li>
-            ))}
-          </ul>
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated captions</h3>
+
+          {generatedCaptions.map((caption, index) => {
+            const captionText =
+              typeof caption.content === "string"
+                ? caption.content
+                : typeof caption.caption === "string"
+                  ? caption.caption
+                  : JSON.stringify(caption);
+            const cardImageUrl =
+              typeof caption.imageUrl === "string"
+                ? caption.imageUrl
+                : typeof caption.url === "string"
+                  ? caption.url
+                  : previewUrl;
+
+            return (
+              <article
+                key={caption.id ? String(caption.id) : `generated-caption-${index}`}
+                className="space-y-3 rounded-xl border border-white/10 bg-slate-900/70 p-4"
+              >
+                {cardImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={cardImageUrl}
+                    alt="Generated caption image"
+                    className="w-full rounded-lg border border-white/10 object-contain"
+                  />
+                ) : null}
+
+                <p className="rounded-lg bg-slate-950/70 p-3 text-slate-100">{captionText}</p>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void submitVote(caption.id, 1)}
+                    disabled={voteStatus === "saving" || !caption.id}
+                    className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
+                  >
+                    Upvote (+1)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitVote(caption.id, -1)}
+                    disabled={voteStatus === "saving" || !caption.id}
+                    className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
+                  >
+                    Downvote (-1)
+                  </button>
+                </div>
+
+                {!caption.id ? (
+                  <p className="text-xs text-amber-300">
+                    This caption record is missing an ID, so voting is disabled for this item.
+                  </p>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
+      ) : null}
+
+      {voteMessage ? (
+        <p className={`text-sm ${voteStatus === "error" ? "text-rose-300" : "text-emerald-300"}`}>
+          {voteMessage}
+        </p>
       ) : null}
     </section>
   );
