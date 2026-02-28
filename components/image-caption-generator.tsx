@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type CaptionRecord = {
   id?: string | number;
@@ -37,6 +37,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [currentCaptionIndex, setCurrentCaptionIndex] = useState(0);
   const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "error">("idle");
   const [voteMessage, setVoteMessage] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const previewUrl = useMemo(
     () => (selectedFile ? URL.createObjectURL(selectedFile) : null),
@@ -51,7 +52,24 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     };
   }, [previewUrl]);
 
+  const hasCompletedVoting =
+    generatedCaptions.length > 0 && currentCaptionIndex >= generatedCaptions.length;
   const currentCaption = generatedCaptions[currentCaptionIndex] ?? null;
+
+  function resetGenerator() {
+    setSelectedFile(null);
+    setStatus("idle");
+    setMessage("");
+    setImageId(null);
+    setGeneratedCaptions([]);
+    setCurrentCaptionIndex(0);
+    setVoteStatus("idle");
+    setVoteMessage("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
 
   async function submitVote(captionId: string | number | undefined, vote: 1 | -1) {
     if (!canVote) {
@@ -146,6 +164,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
 
       <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
           onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
@@ -161,7 +180,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         </button>
       </form>
 
-      {previewUrl ? (
+      {previewUrl && !hasCompletedVoting ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={previewUrl}
@@ -178,7 +197,19 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
 
       {imageId ? <p className="text-xs text-slate-300">imageId: {imageId}</p> : null}
 
-      {currentCaption ? (
+      {hasCompletedVoting ? (
+        <div className="space-y-3 rounded-xl border border-emerald-300/30 bg-emerald-500/10 p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">All done</h3>
+          <p className="text-sm text-emerald-100">You voted on all captions!</p>
+          <button
+            type="button"
+            onClick={resetGenerator}
+            className="rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
+          >
+            Upload a new image
+          </button>
+        </div>
+      ) : currentCaption ? (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated caption</h3>
           <p className="text-xs text-slate-400">
