@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import CaptionVoteForm from "@/components/caption-vote-form";
-import { fetchCaptionCards } from "@/lib/caption-feed";
+import ImageCaptionGenerator from "@/components/image-caption-generator";
 
 async function getUserEmail() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,45 +35,41 @@ async function getUserEmail() {
 
 export default async function ProtectedPage() {
   const { email, error } = await getUserEmail();
-  const captions = email ? await fetchCaptionCards().catch((err) => { 
-  console.error("SUPABASE ERROR:", err); 
-  return []; 
-}) : [];
 
   return (
-    <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-3xl border border-white/10 bg-slate-900/60 p-10">
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 px-6 py-12 text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-28 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+      </div>
+
+      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-[2rem] border border-white/10 bg-slate-900/55 p-6 shadow-[0_30px_100px_-40px_rgba(14,165,233,0.65)] backdrop-blur-xl sm:p-10">
         <header className="space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">
-            Assignment 4
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Create Captions. Shape the Feed.</h1>
+          <p className="max-w-2xl text-slate-300">
+            Generate caption ideas from your images, then keep the community feed sharp by voting on the best lines.
           </p>
-          <h1 className="text-4xl font-semibold">Mutating Data</h1>
         </header>
 
         {email ? (
-          <div className="space-y-5 text-slate-200">
-            <p>
-              You are signed in as <span className="font-semibold text-white">{email}</span>.
-            </p>
-            <p>Vote on one caption at a time. Each click inserts +1 or -1 in caption_votes.</p>
-            <section id="rate-caption">
-              <CaptionVoteForm captions={captions} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section id="generate-caption" className="xl:col-span-1">
+              <ImageCaptionGenerator canVote={Boolean(email)} />
             </section>
-            <a
-              className="inline-flex w-fit items-center justify-center rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-              href="/auth/logout"
-            >
-              Sign out
-            </a>
+
+            <section id="rate-caption" className="xl:col-span-1">
+              <CaptionVoteForm />
+            </section>
           </div>
         ) : (
-          <div className="space-y-3 text-slate-200">
-            <p>{error ?? "You must sign in to view this page."}</p>
+          <div className="space-y-3 rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-xl">
+            <p>{error ?? "You must sign in to upload images, generate captions, and vote."}</p>
             <a
-              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-300"
+              className="inline-flex w-fit items-center justify-center rounded-full bg-sky-400 px-5 py-2 text-sm font-semibold text-slate-900 transition duration-300 hover:-translate-y-0.5 hover:bg-sky-300"
               href="/auth/login"
             >
-              Sign in with Google
+              Sign in with Google to continue
             </a>
           </div>
         )}
