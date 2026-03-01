@@ -63,7 +63,7 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
   captionsEndpoint.searchParams.set(
     "select",
-    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn}`,
+    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn},${captionImageUrlColumn}`,
   );
   captionsEndpoint.searchParams.set(
     "limit",
@@ -71,25 +71,33 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
   );
   captionsEndpoint.searchParams.set(captionPublicColumn, "eq.true");
 
-  const imagesEndpoint = new URL(`/rest/v1/${imagesTable}`, supabaseUrl);
-  imagesEndpoint.searchParams.set("select", `${imagesIdColumn},${imageUrlColumn}`);
-  imagesEndpoint.searchParams.set(
-    "limit",
-    String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),
+  const captions = await fetchJson(captionsEndpoint, anonKey);
+
+  const imageIds = Array.from(
+    new Set(
+      captions
+        .map((row) => row[captionImageIdColumn])
+        .filter((value): value is string | number => value !== undefined && value !== null)
+        .map((value) => String(value)),
+    ),
   );
 
-  const [captions, images] = await Promise.all([
-    fetchJson(captionsEndpoint, anonKey),
-    fetchJson(imagesEndpoint, anonKey).catch(() => []),
-  ]);
-
   const imageById = new Map<string, string>();
-  for (const row of images) {
-    const id = row[imagesIdColumn] ?? row.id ?? row.uuid;
-    const imageUrl = row[imageUrlColumn] ?? row.url ?? row.image_url;
 
-    if (id !== undefined && imageUrl !== undefined && imageUrl !== null) {
-      imageById.set(String(id), String(imageUrl));
+  if (imageIds.length > 0) {
+    const imagesEndpoint = new URL(`/rest/v1/${imagesTable}`, supabaseUrl);
+    imagesEndpoint.searchParams.set("select", `${imagesIdColumn},${imageUrlColumn}`);
+    imagesEndpoint.searchParams.set(imagesIdColumn, `in.(${imageIds.map(encodeURIComponent).join(",")})`);
+
+    const images = await fetchJson(imagesEndpoint, anonKey).catch(() => []);
+
+    for (const row of images) {
+      const id = row[imagesIdColumn] ?? row.id ?? row.uuid;
+      const imageUrl = row[imageUrlColumn] ?? row.url ?? row.image_url;
+
+      if (id !== undefined && imageUrl !== undefined && imageUrl !== null) {
+        imageById.set(String(id), String(imageUrl));
+      }
     }
   }
 
