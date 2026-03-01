@@ -11,7 +11,7 @@ const DEFAULT_CAPTION_PUBLIC_COLUMN = "is_public";
 const DEFAULT_CAPTION_IMAGE_ID_COLUMN = "image_id";
 const DEFAULT_CAPTION_IMAGE_URL_COLUMN = "image_url";
 const DEFAULT_IMAGES_TABLE = "images";
-const DEFAULT_IMAGES_ID_COLUMN = "uuid";
+const DEFAULT_IMAGES_ID_COLUMN = "id";
 const DEFAULT_IMAGE_URL_COLUMN = "url";
 const DEFAULT_LIMIT = 25;
 
@@ -85,8 +85,8 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
 
   const imageById = new Map<string, string>();
   for (const row of images) {
-    const id = row[imagesIdColumn];
-    const imageUrl = row[imageUrlColumn];
+    const id = row[imagesIdColumn] ?? row.id ?? row.uuid;
+    const imageUrl = row[imageUrlColumn] ?? row.url ?? row.image_url;
 
     if (id !== undefined && imageUrl !== undefined && imageUrl !== null) {
       imageById.set(String(id), String(imageUrl));
