@@ -53,29 +53,25 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
     process.env.CAPTIONS_PUBLIC_COLUMN ?? DEFAULT_CAPTION_PUBLIC_COLUMN;
   const captionImageIdColumn =
     process.env.CAPTIONS_IMAGE_ID_COLUMN ?? DEFAULT_CAPTION_IMAGE_ID_COLUMN;
- // Remove the default fallback so it stays undefined if not set
+  
+  // 1. Safe Image URL Column setup
   const captionImageUrlColumn = process.env.CAPTIONS_IMAGE_URL_COLUMN;
 
+  const imagesTable = process.env.IMAGES_TABLE ?? DEFAULT_IMAGES_TABLE;
+  const imagesIdColumn = process.env.IMAGES_ID_COLUMN ?? DEFAULT_IMAGES_ID_COLUMN;
+  const imageUrlColumn = process.env.IMAGES_URL_COLUMN ?? DEFAULT_IMAGE_URL_COLUMN;
+  const limit = Number(process.env.CAPTIONS_LIMIT ?? DEFAULT_LIMIT);
+
+  // 2. We only declare the endpoint ONCE
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
   
-  // Only ask for the URL column if the env var is actually provided
+  // 3. We safely build the select statement
   const selectColumns = [captionIdColumn, captionTextColumn, captionImageIdColumn];
   if (captionImageUrlColumn) {
     selectColumns.push(captionImageUrlColumn);
   }
 
   captionsEndpoint.searchParams.set("select", selectColumns.join(","));
-  
-  const imagesTable = process.env.IMAGES_TABLE ?? DEFAULT_IMAGES_TABLE;
-  const imagesIdColumn = process.env.IMAGES_ID_COLUMN ?? DEFAULT_IMAGES_ID_COLUMN;
-  const imageUrlColumn = process.env.IMAGES_URL_COLUMN ?? DEFAULT_IMAGE_URL_COLUMN;
-  const limit = Number(process.env.CAPTIONS_LIMIT ?? DEFAULT_LIMIT);
-
-  const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
-  captionsEndpoint.searchParams.set(
-    "select",
-    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn},${captionImageUrlColumn}`,
-  );
   captionsEndpoint.searchParams.set(
     "limit",
     String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),
@@ -121,7 +117,8 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
         return null;
       }
 
-      const directImageUrl = row[captionImageUrlColumn];
+      // Safely check for direct image URL if the column exists
+      const directImageUrl = captionImageUrlColumn ? row[captionImageUrlColumn] : undefined;
       const imageId = row[captionImageIdColumn];
 
       const imageUrl =
