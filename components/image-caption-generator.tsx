@@ -14,6 +14,7 @@ type CaptionRecord = {
 type GenerateCaptionsResponse = {
   imageId?: string;
   captions?: CaptionRecord[];
+  generatedCaptions?: string[];
   error?: string;
 };
 
@@ -147,16 +148,20 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
       body: formData,
     });
 
-    const payload = (await response.json()) as GenerateCaptionsResponse;
+    const payload = (await response.json().catch(() => ({ error: "The server returned an unreadable response." }))) as GenerateCaptionsResponse;
 
     if (!response.ok) {
       setStatus("error");
-      setMessage(payload.error ?? "Failed to generate captions.");
+      setMessage(payload.error ?? `Failed to generate captions (HTTP ${response.status}).`);
       return;
     }
 
     setStatus("success");
-    setMessage("Captions generated successfully.");
+    setMessage(
+      Array.isArray(payload.captions) && payload.captions.length > 0
+        ? "Captions generated and saved successfully."
+        : "Caption generation completed, but no caption rows were returned.",
+    );
     setImageId(payload.imageId ?? null);
     setGeneratedCaptions(Array.isArray(payload.captions) ? payload.captions : []);
     setCurrentCaptionIndex(0);

@@ -9,7 +9,6 @@ const DEFAULT_CAPTION_ID_COLUMN = "id";
 const DEFAULT_CAPTION_TEXT_COLUMN = "content";
 const DEFAULT_CAPTION_PUBLIC_COLUMN = "is_public";
 const DEFAULT_CAPTION_IMAGE_ID_COLUMN = "image_id";
-const DEFAULT_CAPTION_IMAGE_URL_COLUMN = "image_url";
 const DEFAULT_IMAGES_TABLE = "images";
 const DEFAULT_IMAGES_ID_COLUMN = "id";
 const DEFAULT_IMAGE_URL_COLUMN = "url";
@@ -53,10 +52,7 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
     process.env.CAPTIONS_PUBLIC_COLUMN ?? DEFAULT_CAPTION_PUBLIC_COLUMN;
   const captionImageIdColumn =
     process.env.CAPTIONS_IMAGE_ID_COLUMN ?? DEFAULT_CAPTION_IMAGE_ID_COLUMN;
-  
-  // 1. Safe Image URL Column setup
   const captionImageUrlColumn = process.env.CAPTIONS_IMAGE_URL_COLUMN;
-
   const imagesTable = process.env.IMAGES_TABLE ?? DEFAULT_IMAGES_TABLE;
   const imagesIdColumn = process.env.IMAGES_ID_COLUMN ?? DEFAULT_IMAGES_ID_COLUMN;
   const imageUrlColumn = process.env.IMAGES_URL_COLUMN ?? DEFAULT_IMAGE_URL_COLUMN;
@@ -64,10 +60,12 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
 
   // 2. We only declare the endpoint ONCE
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
-  captionsEndpoint.searchParams.set(
-    "select",
-    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn},${captionImageUrlColumn}`,
-  );
+  const captionSelectColumns = [captionIdColumn, captionTextColumn, captionImageIdColumn];
+  if (captionImageUrlColumn) {
+    captionSelectColumns.push(captionImageUrlColumn);
+  }
+
+  captionsEndpoint.searchParams.set("select", captionSelectColumns.join(","));
   captionsEndpoint.searchParams.set(
     "limit",
     String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),
@@ -113,7 +111,6 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
         return null;
       }
 
-      // Safely check for direct image URL if the column exists
       const directImageUrl = captionImageUrlColumn ? row[captionImageUrlColumn] : undefined;
       const imageId = row[captionImageIdColumn];
 
