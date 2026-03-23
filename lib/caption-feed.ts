@@ -58,6 +58,7 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
   const imageUrlColumn = process.env.IMAGES_URL_COLUMN ?? DEFAULT_IMAGE_URL_COLUMN;
   const limit = Number(process.env.CAPTIONS_LIMIT ?? DEFAULT_LIMIT);
 
+  // 2. We only declare the endpoint ONCE
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
   const captionSelectColumns = [captionIdColumn, captionTextColumn, captionImageIdColumn];
   if (captionImageUrlColumn) {
