@@ -64,14 +64,10 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
 
   // 2. We only declare the endpoint ONCE
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
-  
-  // 3. We safely build the select statement
-  const selectColumns = [captionIdColumn, captionTextColumn, captionImageIdColumn];
-  if (captionImageUrlColumn) {
-    selectColumns.push(captionImageUrlColumn);
-  }
-
-  captionsEndpoint.searchParams.set("select", selectColumns.join(","));
+  captionsEndpoint.searchParams.set(
+    "select",
+    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn},${captionImageUrlColumn}`,
+  );
   captionsEndpoint.searchParams.set(
     "limit",
     String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),

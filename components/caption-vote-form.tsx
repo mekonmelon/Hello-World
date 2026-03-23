@@ -85,7 +85,7 @@ export default function CaptionVoteForm() {
 
   async function submitVote(vote: 1 | -1) {
     if (!currentCaption) {
-      return; // FIXED: This just safely exits the function now
+      return;
     }
 
     setStatus("saving");
@@ -117,16 +117,10 @@ export default function CaptionVoteForm() {
     return <div className={surfaceClass}>Loading a random caption...</div>;
   }
 
-  // FIXED: The error reveal is now in the actual render block!
   if (!currentCaption) {
     return (
       <div className={surfaceClass}>
-        <p>No captions found. Set the captions/images env vars and verify data exists.</p>
-        {message && (
-          <div className="mt-4 rounded-xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm font-mono text-rose-200">
-            <strong>System Error:</strong> {message}
-          </div>
-        )}
+        No captions found. Set the captions/images env vars and verify data exists.
       </div>
     );
   }
