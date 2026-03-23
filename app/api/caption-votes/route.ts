@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { resolveCurrentProfileId } from "@/lib/profile-id";
 
 type VotePayload = {
   captionId: string;
@@ -49,12 +50,27 @@ function parseVotePayload(payload: VotePayload): ParsedPayload | { error: string
   };
 }
 
-async function getAuthenticatedUserId(params: {
+async function findExistingVote(params: {
   supabaseUrl: string;
   anonKey: string;
   accessToken: string;
+  tableName: string;
+  captionColumn: string;
+  userIdColumn?: string;
+  captionId: string | number;
+  profileId: string;
 }) {
-  const response = await fetch(new URL("/auth/v1/user", params.supabaseUrl), {
+  if (!params.userIdColumn) {
+    return null;
+  }
+
+  const endpoint = new URL(`/rest/v1/${params.tableName}`, params.supabaseUrl);
+  endpoint.searchParams.set("select", "id");
+  endpoint.searchParams.set(params.captionColumn, `eq.${String(params.captionId)}`);
+  endpoint.searchParams.set(params.userIdColumn, `eq.${params.profileId}`);
+  endpoint.searchParams.set("limit", "1");
+
+  const response = await fetch(endpoint, {
     headers: {
       apikey: params.anonKey,
       Authorization: `Bearer ${params.accessToken}`,
@@ -63,11 +79,13 @@ async function getAuthenticatedUserId(params: {
   });
 
   if (!response.ok) {
-    return null;
+    const details = await response.text();
+    throw new Error(`Vote lookup failed (${response.status}): ${details}`);
   }
 
-  const user = (await response.json()) as { id?: string };
-  return user.id ?? null;
+  const rows = (await response.json()) as Array<{ id?: string | number }>;
+  const id = rows[0]?.id;
+  return id === undefined || id === null ? null : String(id);
 }
 
 export async function POST(request: Request) {
@@ -95,54 +113,94 @@ export async function POST(request: Request) {
       process.env.CAPTION_VOTES_SCORE_COLUMN ??
       DEFAULT_VOTE_COLUMN;
     const userIdColumn = process.env.CAPTION_VOTES_USER_ID_COLUMN;
+    const profileId = await resolveCurrentProfileId({
+      supabaseUrl,
+      anonKey,
+      accessToken,
+    });
+
+    if (!profileId) {
+      return NextResponse.json(
+        { error: "Could not resolve signed-in user's profiles.id." },
+        { status: 401 },
+      );
+    }
+
+    const existingVoteId = await findExistingVote({
+      supabaseUrl,
+      anonKey,
+      accessToken,
+      tableName,
+      captionColumn,
+      userIdColumn,
+      captionId: parsed.captionId,
+      profileId,
+    });
 
     const row: Record<string, string | number> = {
       [captionColumn]: parsed.captionId,
       [voteColumn]: parsed.vote,
-      created_datetime_utc: new Date().toISOString(),
+      modified_by_user_id: profileId,
     };
 
     if (userIdColumn) {
-      const userId = await getAuthenticatedUserId({
-        supabaseUrl,
-        anonKey,
-        accessToken,
+      row[userIdColumn] = profileId;
+    }
+
+    if (existingVoteId) {
+      const updateEndpoint = new URL(`/rest/v1/${tableName}`, supabaseUrl);
+      updateEndpoint.searchParams.set("id", `eq.${existingVoteId}`);
+
+      const updateResponse = await fetch(updateEndpoint, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(row),
       });
 
-      if (!userId) {
+      if (!updateResponse.ok) {
+        const details = await updateResponse.text();
         return NextResponse.json(
-          { error: "Could not resolve signed-in user for vote insert." },
-          { status: 401 },
+          {
+            error: `Update failed (${updateResponse.status}): ${details}`,
+          },
+          { status: 400 },
         );
       }
 
-      row[userIdColumn] = userId;
+      const rows = (await updateResponse.json()) as Array<Record<string, unknown>>;
+      return NextResponse.json({ row: rows[0] ?? null }, { status: 200 });
     }
 
-    const endpoint = new URL(`/rest/v1/${tableName}?on_conflict=${userIdColumn},${captionColumn}`, supabaseUrl);
+    row.created_by_user_id = profileId;
 
-    const response = await fetch(endpoint, {
+    const insertEndpoint = new URL(`/rest/v1/${tableName}`, supabaseUrl);
+    const insertResponse = await fetch(insertEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         apikey: anonKey,
         Authorization: `Bearer ${accessToken}`,
-        Prefer: "return=representation,resolution=merge-duplicates",
+        Prefer: "return=representation",
       },
       body: JSON.stringify([row]),
     });
 
-    if (!response.ok) {
-      const details = await response.text();
+    if (!insertResponse.ok) {
+      const details = await insertResponse.text();
       return NextResponse.json(
         {
-          error: `Insert failed (${response.status}): ${details}`,
+          error: `Insert failed (${insertResponse.status}): ${details}`,
         },
         { status: 400 },
       );
     }
 
-    const rows = (await response.json()) as Array<Record<string, unknown>>;
+    const rows = (await insertResponse.json()) as Array<Record<string, unknown>>;
 
     return NextResponse.json({ row: rows[0] ?? null }, { status: 201 });
   } catch (error) {
