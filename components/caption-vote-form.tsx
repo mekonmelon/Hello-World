@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CaptionCard } from "@/lib/caption-feed";
 
 type ApiResponse = {
@@ -8,104 +8,209 @@ type ApiResponse = {
   error?: string;
 };
 
-type Props = {
-  captions: CaptionCard[];
+type RandomCaptionResponse = {
+  caption?: CaptionCard | null;
+  error?: string;
 };
 
-export default function CaptionVoteForm({ captions }: Props) {
-  const [index, setIndex] = useState(0);
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">(
-    "idle",
-  );
+type CurrentVoteResponse = {
+  vote?: {
+    vote?: 1 | -1;
+  } | null;
+  error?: string;
+};
+
+const surfaceClass =
+  "rounded-3xl border border-white/15 bg-white/10 p-6 shadow-[0_20px_80px_-30px_rgba(56,189,248,0.55)] backdrop-blur-xl";
+const voteButtonClass =
+  "rounded-full px-5 py-2.5 text-sm font-semibold transition duration-300 disabled:cursor-not-allowed disabled:opacity-60";
+
+async function fetchRandomCaption() {
+  const response = await fetch("/api/captions/random", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  const result = (await response.json()) as RandomCaptionResponse;
+
+  if (!response.ok) {
+    throw new Error(result.error ?? "Could not load a caption.");
+  }
+
+  return result.caption ?? null;
+}
+
+export default function CaptionVoteForm() {
+  const [currentCaption, setCurrentCaption] = useState<CaptionCard | null>(null);
+  const [status, setStatus] = useState<"loading" | "idle" | "saving" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [currentVote, setCurrentVote] = useState<1 | -1 | null>(null);
 
-  const current = captions[index] ?? null;
-
-  async function submitVote(vote: 1 | -1) {
-    if (!current) {
+  useEffect(() => {
+    if (!message || status === "saving" || status === "error") {
       return;
     }
 
+    const timeout = setTimeout(() => {
+      setMessage("");
+      setStatus("idle");
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [message, status]);
+
+  async function readCurrentVote(captionId: string) {
+    const response = await fetch(`/api/caption-votes?captionId=${encodeURIComponent(captionId)}`, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    const result = (await response.json()) as CurrentVoteResponse;
+    if (!response.ok) {
+      return null;
+    }
+
+    const vote = result.vote?.vote;
+    return vote === 1 || vote === -1 ? vote : null;
+  }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialCaption() {
+      try {
+        const caption = await fetchRandomCaption();
+        const hydratedVote = caption?.id ? await readCurrentVote(String(caption.id)) : null;
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCurrentVote(hydratedVote);
+        setCurrentCaption(caption);
+        setStatus("idle");
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setStatus("error");
+        setMessage(error instanceof Error ? error.message : "Could not load a caption.");
+      }
+    }
+
+    void loadInitialCaption();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function submitVote(vote: 1 | -1) {
+    if (!currentCaption) {
+      return;
+    }
+
+    const previousVote = currentVote;
     setStatus("saving");
-    setMessage("");
+    setMessage("Saving vote...");
+    setCurrentVote(vote);
 
     const response = await fetch("/api/caption-votes", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ captionId: current.id, vote: String(vote) }),
+      credentials: "include",
+      body: JSON.stringify({ captionId: currentCaption.id, vote: String(vote) }),
     });
 
     const result = (await response.json()) as ApiResponse;
 
     if (!response.ok) {
       setStatus("error");
-      setMessage(result.error ?? "Could not submit vote.");
+      setCurrentVote(previousVote);
+      setMessage(result.error ?? "Vote failed. Please try again.");
       return;
     }
 
     setStatus("success");
-    setMessage(`Vote saved for caption ${current.id}.`);
-
-    if (captions.length > 1) {
-      setIndex((prev) => (prev + 1) % captions.length);
+    if (previousVote === vote) {
+      setMessage(vote === 1 ? "Upvoted." : "Downvoted.");
+    } else {
+      setMessage("Vote updated.");
     }
   }
 
-  if (!current) {
+  if (status === "loading" && !currentCaption) {
+    return <div className={surfaceClass}>Loading a random caption...</div>;
+  }
+
+  if (!currentCaption) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-slate-200">
+      <div className={surfaceClass}>
         No captions found. Set the captions/images env vars and verify data exists.
       </div>
     );
   }
 
   return (
-    <section className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-      <h2 className="text-xl font-semibold text-white">Rate this caption</h2>
-      <p className="text-sm text-slate-300">
-        Caption {index + 1} of {captions.length}
-      </p>
+    <section className={`${surfaceClass} space-y-4`}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-white">Community Caption Voting</h2>
+        <span className="rounded-full border border-sky-300/40 bg-sky-400/10 px-3 py-1 text-xs text-sky-200">
+          Live random card
+        </span>
+      </div>
 
-      {current.imageUrl ? (
+      <p className="text-sm text-slate-300">Each vote loads a new random caption from the community pool.</p>
+
+      {currentCaption.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={current.imageUrl}
+          src={currentCaption.imageUrl}
           alt="Caption candidate"
-          className="w-full rounded-xl border border-white/10 object-cover"
+          className="w-full rounded-2xl border border-white/20 object-cover shadow-lg shadow-black/35"
         />
       ) : (
-        <div className="rounded-xl border border-dashed border-white/20 p-6 text-sm text-slate-400">
+        <div className="rounded-2xl border border-dashed border-white/25 bg-slate-900/45 p-6 text-sm text-slate-300">
           No image URL was found for this caption.
         </div>
       )}
 
-      <p className="rounded-lg bg-slate-900/80 p-4 text-slate-100">{current.text}</p>
+      <p className="rounded-xl border border-white/10 bg-slate-950/80 p-4 text-slate-100">{currentCaption.text}</p>
 
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={() => void submitVote(1)}
-          disabled={status === "saving"}
-          className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-300 disabled:opacity-60"
+          disabled={status === "saving" || status === "loading"}
+          className={`${voteButtonClass} ${
+            currentVote === 1
+              ? "ring-2 ring-emerald-200 ring-offset-2 ring-offset-slate-900 bg-emerald-300 text-slate-950"
+              : "bg-emerald-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(52,211,153,1)] hover:-translate-y-0.5 hover:bg-emerald-300"
+          }`}
         >
-          Upvote (+1)
+          {currentVote === 1 ? "✓ Upvoted (+1)" : "Upvote (+1)"}
         </button>
         <button
           type="button"
           onClick={() => void submitVote(-1)}
-          disabled={status === "saving"}
-          className="rounded-full bg-rose-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-rose-300 disabled:opacity-60"
+          disabled={status === "saving" || status === "loading"}
+          className={`${voteButtonClass} ${
+            currentVote === -1
+              ? "ring-2 ring-rose-200 ring-offset-2 ring-offset-slate-900 bg-rose-300 text-slate-950"
+              : "bg-rose-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(251,113,133,1)] hover:-translate-y-0.5 hover:bg-rose-300"
+          }`}
         >
-          Downvote (-1)
+          {currentVote === -1 ? "✓ Downvoted (-1)" : "Downvote (-1)"}
         </button>
       </div>
 
       {message ? (
-        <p className={`text-sm ${status === "error" ? "text-rose-300" : "text-emerald-300"}`}>
-          {message}
-        </p>
+        <p className={`text-sm ${status === "error" ? "text-rose-300" : status === "saving" ? "text-sky-200" : "text-emerald-200"}`}>{message}</p>
       ) : null}
     </section>
   );

@@ -9,9 +9,8 @@ const DEFAULT_CAPTION_ID_COLUMN = "id";
 const DEFAULT_CAPTION_TEXT_COLUMN = "content";
 const DEFAULT_CAPTION_PUBLIC_COLUMN = "is_public";
 const DEFAULT_CAPTION_IMAGE_ID_COLUMN = "image_id";
-const DEFAULT_CAPTION_IMAGE_URL_COLUMN = "image_url";
 const DEFAULT_IMAGES_TABLE = "images";
-const DEFAULT_IMAGES_ID_COLUMN = "uuid";
+const DEFAULT_IMAGES_ID_COLUMN = "id";
 const DEFAULT_IMAGE_URL_COLUMN = "url";
 const DEFAULT_LIMIT = 25;
 
@@ -53,43 +52,52 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
     process.env.CAPTIONS_PUBLIC_COLUMN ?? DEFAULT_CAPTION_PUBLIC_COLUMN;
   const captionImageIdColumn =
     process.env.CAPTIONS_IMAGE_ID_COLUMN ?? DEFAULT_CAPTION_IMAGE_ID_COLUMN;
-  const captionImageUrlColumn =
-    process.env.CAPTIONS_IMAGE_URL_COLUMN ?? DEFAULT_CAPTION_IMAGE_URL_COLUMN;
+  const captionImageUrlColumn = process.env.CAPTIONS_IMAGE_URL_COLUMN;
   const imagesTable = process.env.IMAGES_TABLE ?? DEFAULT_IMAGES_TABLE;
   const imagesIdColumn = process.env.IMAGES_ID_COLUMN ?? DEFAULT_IMAGES_ID_COLUMN;
   const imageUrlColumn = process.env.IMAGES_URL_COLUMN ?? DEFAULT_IMAGE_URL_COLUMN;
   const limit = Number(process.env.CAPTIONS_LIMIT ?? DEFAULT_LIMIT);
 
   const captionsEndpoint = new URL(`/rest/v1/${captionsTable}`, supabaseUrl);
-  captionsEndpoint.searchParams.set(
-    "select",
-    `${captionIdColumn},${captionTextColumn},${captionImageIdColumn}`,
-  );
+  const captionSelectColumns = [captionIdColumn, captionTextColumn, captionImageIdColumn];
+  if (captionImageUrlColumn) {
+    captionSelectColumns.push(captionImageUrlColumn);
+  }
+
+  captionsEndpoint.searchParams.set("select", captionSelectColumns.join(","));
   captionsEndpoint.searchParams.set(
     "limit",
     String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),
   );
   captionsEndpoint.searchParams.set(captionPublicColumn, "eq.true");
 
-  const imagesEndpoint = new URL(`/rest/v1/${imagesTable}`, supabaseUrl);
-  imagesEndpoint.searchParams.set("select", `${imagesIdColumn},${imageUrlColumn}`);
-  imagesEndpoint.searchParams.set(
-    "limit",
-    String(Number.isNaN(limit) ? DEFAULT_LIMIT : limit),
+  const captions = await fetchJson(captionsEndpoint, anonKey);
+
+  const imageIds = Array.from(
+    new Set(
+      captions
+        .map((row) => row[captionImageIdColumn])
+        .filter((value): value is string | number => value !== undefined && value !== null)
+        .map((value) => String(value)),
+    ),
   );
 
-  const [captions, images] = await Promise.all([
-    fetchJson(captionsEndpoint, anonKey),
-    fetchJson(imagesEndpoint, anonKey).catch(() => []),
-  ]);
-
   const imageById = new Map<string, string>();
-  for (const row of images) {
-    const id = row[imagesIdColumn];
-    const imageUrl = row[imageUrlColumn];
 
-    if (id !== undefined && imageUrl !== undefined && imageUrl !== null) {
-      imageById.set(String(id), String(imageUrl));
+  if (imageIds.length > 0) {
+    const imagesEndpoint = new URL(`/rest/v1/${imagesTable}`, supabaseUrl);
+    imagesEndpoint.searchParams.set("select", `${imagesIdColumn},${imageUrlColumn}`);
+    imagesEndpoint.searchParams.set(imagesIdColumn, `in.(${imageIds.map(encodeURIComponent).join(",")})`);
+
+    const images = await fetchJson(imagesEndpoint, anonKey).catch(() => []);
+
+    for (const row of images) {
+      const id = row[imagesIdColumn] ?? row.id ?? row.uuid;
+      const imageUrl = row[imageUrlColumn] ?? row.url ?? row.image_url;
+
+      if (id !== undefined && imageUrl !== undefined && imageUrl !== null) {
+        imageById.set(String(id), String(imageUrl));
+      }
     }
   }
 
@@ -102,7 +110,7 @@ export async function fetchCaptionCards(): Promise<CaptionCard[]> {
         return null;
       }
 
-      const directImageUrl = row[captionImageUrlColumn];
+      const directImageUrl = captionImageUrlColumn ? row[captionImageUrlColumn] : undefined;
       const imageId = row[captionImageIdColumn];
 
       const imageUrl =
