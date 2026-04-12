@@ -16,6 +16,12 @@ type ParsedPayload = {
   vote: 1 | -1;
 };
 
+type VoteLookupRow = {
+  id?: string | number;
+  vote?: number | string;
+  vote_value?: number | string;
+};
+
 function getSupabaseEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -86,6 +92,120 @@ async function findExistingVote(params: {
   const rows = (await response.json()) as Array<{ id?: string | number }>;
   const id = rows[0]?.id;
   return id === undefined || id === null ? null : String(id);
+}
+
+async function getCurrentVote(params: {
+  supabaseUrl: string;
+  anonKey: string;
+  accessToken: string;
+  tableName: string;
+  captionColumn: string;
+  voteColumn: string;
+  userIdColumn?: string;
+  captionId: string;
+  profileId: string;
+}) {
+  if (!params.userIdColumn) {
+    return null;
+  }
+
+  const endpoint = new URL(`/rest/v1/${params.tableName}`, params.supabaseUrl);
+  endpoint.searchParams.set("select", `id,${params.voteColumn}`);
+  endpoint.searchParams.set(params.captionColumn, `eq.${params.captionId}`);
+  endpoint.searchParams.set(params.userIdColumn, `eq.${params.profileId}`);
+  endpoint.searchParams.set("limit", "1");
+
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: params.anonKey,
+      Authorization: `Bearer ${params.accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Vote read failed (${response.status}): ${details}`);
+  }
+
+  const rows = (await response.json()) as VoteLookupRow[];
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const rawVote = row[params.voteColumn as keyof VoteLookupRow] ?? row.vote ?? row.vote_value;
+  const normalizedVote = Number(rawVote);
+
+  if (normalizedVote !== 1 && normalizedVote !== -1) {
+    return null;
+  }
+
+  return {
+    id: row.id ? String(row.id) : null,
+    vote: normalizedVote as 1 | -1,
+  };
+}
+
+export async function GET(request: Request) {
+  try {
+    const { supabaseUrl, anonKey } = getSupabaseEnv();
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get("sb-access-token")?.value;
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "You must sign in first." }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const captionId = (url.searchParams.get("captionId") ?? "").trim();
+    if (!captionId) {
+      return NextResponse.json({ error: "captionId is required." }, { status: 400 });
+    }
+
+    const tableName = process.env.CAPTION_VOTES_TABLE ?? DEFAULT_TABLE;
+    const captionColumn =
+      process.env.CAPTION_VOTES_CAPTION_ID_COLUMN ?? DEFAULT_CAPTION_COLUMN;
+    const voteColumn =
+      process.env.CAPTION_VOTES_VOTE_COLUMN ??
+      process.env.CAPTION_VOTES_SCORE_COLUMN ??
+      DEFAULT_VOTE_COLUMN;
+    const userIdColumn = process.env.CAPTION_VOTES_USER_ID_COLUMN;
+
+    const profileId = await resolveCurrentProfileId({
+      supabaseUrl,
+      anonKey,
+      accessToken,
+    });
+
+    if (!profileId) {
+      return NextResponse.json(
+        { error: "Could not resolve signed-in user's profiles.id." },
+        { status: 401 },
+      );
+    }
+
+    const vote = await getCurrentVote({
+      supabaseUrl,
+      anonKey,
+      accessToken,
+      tableName,
+      captionColumn,
+      voteColumn,
+      userIdColumn,
+      captionId,
+      profileId,
+    });
+
+    return NextResponse.json({ vote }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unexpected error.",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {

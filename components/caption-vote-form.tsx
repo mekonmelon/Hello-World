@@ -13,6 +13,13 @@ type RandomCaptionResponse = {
   error?: string;
 };
 
+type CurrentVoteResponse = {
+  vote?: {
+    vote?: 1 | -1;
+  } | null;
+  error?: string;
+};
+
 const surfaceClass =
   "rounded-3xl border border-white/15 bg-white/10 p-6 shadow-[0_20px_80px_-30px_rgba(56,189,248,0.55)] backdrop-blur-xl";
 const voteButtonClass =
@@ -38,6 +45,36 @@ export default function CaptionVoteForm() {
   const [currentCaption, setCurrentCaption] = useState<CaptionCard | null>(null);
   const [status, setStatus] = useState<"loading" | "idle" | "saving" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [currentVote, setCurrentVote] = useState<1 | -1 | null>(null);
+
+  useEffect(() => {
+    if (!message || status === "saving" || status === "error") {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setMessage("");
+      setStatus("idle");
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [message, status]);
+
+  async function readCurrentVote(captionId: string) {
+    const response = await fetch(`/api/caption-votes?captionId=${encodeURIComponent(captionId)}`, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    const result = (await response.json()) as CurrentVoteResponse;
+    if (!response.ok) {
+      return null;
+    }
+
+    const vote = result.vote?.vote;
+    return vote === 1 || vote === -1 ? vote : null;
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -45,11 +82,13 @@ export default function CaptionVoteForm() {
     async function loadInitialCaption() {
       try {
         const caption = await fetchRandomCaption();
+        const hydratedVote = caption?.id ? await readCurrentVote(String(caption.id)) : null;
 
         if (!isMounted) {
           return;
         }
 
+        setCurrentVote(hydratedVote);
         setCurrentCaption(caption);
         setStatus("idle");
       } catch (error) {
@@ -69,27 +108,15 @@ export default function CaptionVoteForm() {
     };
   }, []);
 
-  async function loadNextRandomCaption() {
-    setStatus("loading");
-    setMessage("");
-
-    try {
-      const caption = await fetchRandomCaption();
-      setCurrentCaption(caption);
-      setStatus("idle");
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not load a caption.");
-    }
-  }
-
   async function submitVote(vote: 1 | -1) {
     if (!currentCaption) {
       return;
     }
 
+    const previousVote = currentVote;
     setStatus("saving");
-    setMessage("");
+    setMessage("Saving vote...");
+    setCurrentVote(vote);
 
     const response = await fetch("/api/caption-votes", {
       method: "POST",
@@ -104,13 +131,17 @@ export default function CaptionVoteForm() {
 
     if (!response.ok) {
       setStatus("error");
-      setMessage(result.error ?? "Could not submit vote.");
+      setCurrentVote(previousVote);
+      setMessage(result.error ?? "Vote failed. Please try again.");
       return;
     }
 
     setStatus("success");
-    setMessage(`Vote saved for caption ${currentCaption.id}.`);
-    await loadNextRandomCaption();
+    if (previousVote === vote) {
+      setMessage(vote === 1 ? "Upvoted." : "Downvoted.");
+    } else {
+      setMessage("Vote updated.");
+    }
   }
 
   if (status === "loading" && !currentCaption) {
@@ -156,22 +187,30 @@ export default function CaptionVoteForm() {
           type="button"
           onClick={() => void submitVote(1)}
           disabled={status === "saving" || status === "loading"}
-          className={`${voteButtonClass} bg-emerald-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(52,211,153,1)] hover:-translate-y-0.5 hover:bg-emerald-300`}
+          className={`${voteButtonClass} ${
+            currentVote === 1
+              ? "ring-2 ring-emerald-200 ring-offset-2 ring-offset-slate-900 bg-emerald-300 text-slate-950"
+              : "bg-emerald-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(52,211,153,1)] hover:-translate-y-0.5 hover:bg-emerald-300"
+          }`}
         >
-          Upvote (+1)
+          {currentVote === 1 ? "✓ Upvoted (+1)" : "Upvote (+1)"}
         </button>
         <button
           type="button"
           onClick={() => void submitVote(-1)}
           disabled={status === "saving" || status === "loading"}
-          className={`${voteButtonClass} bg-rose-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(251,113,133,1)] hover:-translate-y-0.5 hover:bg-rose-300`}
+          className={`${voteButtonClass} ${
+            currentVote === -1
+              ? "ring-2 ring-rose-200 ring-offset-2 ring-offset-slate-900 bg-rose-300 text-slate-950"
+              : "bg-rose-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(251,113,133,1)] hover:-translate-y-0.5 hover:bg-rose-300"
+          }`}
         >
-          Downvote (-1)
+          {currentVote === -1 ? "✓ Downvoted (-1)" : "Downvote (-1)"}
         </button>
       </div>
 
       {message ? (
-        <p className={`text-sm ${status === "error" ? "text-rose-300" : "text-emerald-200"}`}>{message}</p>
+        <p className={`text-sm ${status === "error" ? "text-rose-300" : status === "saving" ? "text-sky-200" : "text-emerald-200"}`}>{message}</p>
       ) : null}
     </section>
   );
