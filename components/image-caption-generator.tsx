@@ -29,6 +29,12 @@ type Props = {
   canVote?: boolean;
 };
 
+type CurrentVoteResponse = {
+  vote?: {
+    vote?: 1 | -1;
+  } | null;
+};
+
 export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -36,8 +42,9 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
   const [imageId, setImageId] = useState<string | null>(null);
   const [generatedCaptions, setGeneratedCaptions] = useState<CaptionRecord[]>([]);
   const [currentCaptionIndex, setCurrentCaptionIndex] = useState(0);
-  const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [voteStatus, setVoteStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [voteMessage, setVoteMessage] = useState<string>("");
+  const [currentVote, setCurrentVote] = useState<1 | -1 | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -74,10 +81,50 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     setCurrentCaptionIndex(0);
     setVoteStatus("idle");
     setVoteMessage("");
+    setCurrentVote(null);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  }
+
+  useEffect(() => {
+    if (!voteMessage || voteStatus === "saving" || voteStatus === "error") {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setVoteMessage("");
+      setVoteStatus("idle");
+    }, 1800);
+
+    return () => clearTimeout(timeout);
+  }, [voteMessage, voteStatus]);
+
+  async function readCurrentVote(captionId: string) {
+    const response = await fetch(`/api/caption-votes?captionId=${encodeURIComponent(captionId)}`, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const result = (await response.json()) as CurrentVoteResponse;
+    const vote = result.vote?.vote;
+    return vote === 1 || vote === -1 ? vote : null;
+  }
+
+  async function hydrateVoteForCaption(caption: CaptionRecord | null) {
+    if (!caption?.id) {
+      setCurrentVote(null);
+      return;
+    }
+
+    const vote = await readCurrentVote(String(caption.id));
+    setCurrentVote(vote);
   }
 
   async function submitVote(captionId: string | number | undefined, vote: 1 | -1) {
@@ -94,7 +141,9 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     }
 
     setVoteStatus("saving");
-    setVoteMessage("");
+    setVoteMessage("Saving vote...");
+    const previousVote = currentVote;
+    setCurrentVote(vote);
 
     const response = await fetch("/api/caption-votes", {
       method: "POST",
@@ -107,13 +156,21 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
 
     if (!response.ok) {
       setVoteStatus("error");
-      setVoteMessage(result.error ?? "Could not submit vote.");
+      setCurrentVote(previousVote);
+      setVoteMessage(result.error ?? "Vote failed. Please try again.");
       return;
     }
 
-    setVoteStatus("idle");
-    setVoteMessage("");
-    setCurrentCaptionIndex((previousIndex) => previousIndex + 1);
+    setVoteStatus("success");
+    if (previousVote === vote) {
+      setVoteMessage(vote === 1 ? "Upvoted." : "Downvoted.");
+    } else {
+      setVoteMessage("Vote updated.");
+    }
+
+    const nextIndex = currentCaptionIndex + 1;
+    setCurrentCaptionIndex(nextIndex);
+    await hydrateVoteForCaption(generatedCaptions[nextIndex] ?? null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -138,6 +195,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
     setCurrentCaptionIndex(0);
     setVoteStatus("idle");
     setVoteMessage("");
+    setCurrentVote(null);
 
     const formData = new FormData();
     formData.append("image", selectedFile);
@@ -163,8 +221,10 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         : "Caption generation completed, but no caption rows were returned.",
     );
     setImageId(payload.imageId ?? null);
-    setGeneratedCaptions(Array.isArray(payload.captions) ? payload.captions : []);
+    const nextCaptions = Array.isArray(payload.captions) ? payload.captions : [];
+    setGeneratedCaptions(nextCaptions);
     setCurrentCaptionIndex(0);
+    await hydrateVoteForCaption(nextCaptions[0] ?? null);
   }
 
   return (
@@ -207,7 +267,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         </button>
       </form>
 
-      {previewUrl && !hasCompletedVoting ? (
+      {previewUrl && generatedCaptions.length === 0 ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={previewUrl}
@@ -277,9 +337,13 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
                 void submitVote(currentCaption.id, 1);
               }}
               disabled={voteStatus === "saving" || !currentCaption.id || !canVote}
-              className={`${voteButtonClass} bg-emerald-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(52,211,153,1)] hover:-translate-y-0.5 hover:bg-emerald-300`}
+              className={`${voteButtonClass} ${
+                currentVote === 1
+                  ? "ring-2 ring-emerald-200 ring-offset-2 ring-offset-slate-900 bg-emerald-300 text-slate-950"
+                  : "bg-emerald-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(52,211,153,1)] hover:-translate-y-0.5 hover:bg-emerald-300"
+              }`}
             >
-              Upvote (+1)
+              {currentVote === 1 ? "✓ Upvoted (+1)" : "Upvote (+1)"}
             </button>
             <button
               type="button"
@@ -287,9 +351,13 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
                 void submitVote(currentCaption.id, -1);
               }}
               disabled={voteStatus === "saving" || !currentCaption.id || !canVote}
-              className={`${voteButtonClass} bg-rose-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(251,113,133,1)] hover:-translate-y-0.5 hover:bg-rose-300`}
+              className={`${voteButtonClass} ${
+                currentVote === -1
+                  ? "ring-2 ring-rose-200 ring-offset-2 ring-offset-slate-900 bg-rose-300 text-slate-950"
+                  : "bg-rose-400 text-slate-950 shadow-[0_0_24px_-12px_rgba(251,113,133,1)] hover:-translate-y-0.5 hover:bg-rose-300"
+              }`}
             >
-              Downvote (-1)
+              {currentVote === -1 ? "✓ Downvoted (-1)" : "Downvote (-1)"}
             </button>
           </div>
 
@@ -301,7 +369,11 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         </article>
       ) : null}
 
-      {voteStatus === "error" && voteMessage ? <p className="text-sm text-rose-300">{voteMessage}</p> : null}
+      {voteMessage ? (
+        <p className={`text-sm ${voteStatus === "error" ? "text-rose-300" : voteStatus === "saving" ? "text-sky-200" : "text-emerald-200"}`}>
+          {voteMessage}
+        </p>
+      ) : null}
     </section>
   );
 }
