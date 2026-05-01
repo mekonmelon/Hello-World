@@ -25,6 +25,18 @@ const surfaceClass =
 const voteButtonClass =
   "rounded-full px-5 py-2.5 text-sm font-semibold transition duration-300 disabled:cursor-not-allowed disabled:opacity-60";
 
+function captionText(caption: CaptionRecord) {
+  if (typeof caption.content === "string") return caption.content;
+  if (typeof caption.caption === "string") return caption.caption;
+  return JSON.stringify(caption);
+}
+
+function captionImageUrl(caption: CaptionRecord, fallbackUrl: string | null) {
+  if (typeof caption.imageUrl === "string") return caption.imageUrl;
+  if (typeof caption.url === "string") return caption.url;
+  return fallbackUrl ?? "";
+}
+
 type Props = {
   canVote?: boolean;
 };
@@ -207,20 +219,30 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
         </button>
       </form>
 
-      {previewUrl && !hasCompletedVoting ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={previewUrl}
-          alt="Selected image preview"
-          className="mx-auto max-h-[400px] w-full max-w-md rounded-2xl border border-white/20 object-contain shadow-lg shadow-sky-900/30"
-        />
+      {previewUrl ? (
+        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Uploaded image preview</h3>
+              <p className="mt-1 text-xs text-slate-300">
+                This confirms the uploaded image is available in the app before and after caption generation.
+              </p>
+            </div>
+            {imageId ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">Image ID: {imageId}</span> : null}
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt="Selected image preview"
+            className="mx-auto mt-4 max-h-[360px] w-full max-w-md rounded-2xl border border-white/20 object-contain shadow-lg shadow-sky-900/30"
+          />
+        </div>
       ) : null}
 
       {message ? (
         <p className={`text-sm ${status === "error" ? "text-rose-300" : "text-emerald-200"}`}>{message}</p>
       ) : null}
 
-      {imageId ? <p className="text-xs text-slate-300">imageId: {imageId}</p> : null}
 
       {hasCompletedVoting ? (
         <div className="rounded-2xl border border-emerald-300/35 bg-emerald-400/10 p-4 backdrop-blur">
@@ -235,7 +257,7 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
           </button>
         </div>
       ) : currentCaption ? (
-        <article className="space-y-4 rounded-2xl border border-white/15 bg-slate-900/55 p-5 shadow-inner shadow-sky-950/30 backdrop-blur">
+        <article className="space-y-4 rounded-2xl border border-sky-300/30 bg-slate-900/65 p-5 shadow-[0_0_45px_-28px_rgba(56,189,248,1)] backdrop-blur">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated Caption Card</h3>
             <p className="text-xs text-slate-300">
@@ -243,32 +265,13 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
             </p>
           </div>
 
-          {(typeof currentCaption.imageUrl === "string"
-            ? currentCaption.imageUrl
-            : typeof currentCaption.url === "string"
-              ? currentCaption.url
-              : previewUrl) ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={
-                typeof currentCaption.imageUrl === "string"
-                  ? currentCaption.imageUrl
-                  : typeof currentCaption.url === "string"
-                    ? currentCaption.url
-                    : previewUrl ?? ""
-              }
-              alt="Generated caption image"
-              className="mx-auto max-h-[400px] w-full max-w-md rounded-xl border border-white/20 object-contain shadow-md shadow-black/40"
-            />
-          ) : null}
-
-          <p className="rounded-xl border border-white/10 bg-slate-950/80 p-4 text-slate-100">
-            {typeof currentCaption.content === "string"
-              ? currentCaption.content
-              : typeof currentCaption.caption === "string"
-                ? currentCaption.caption
-                : JSON.stringify(currentCaption)}
-          </p>
+          <div className="rounded-xl border border-white/10 bg-slate-950/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">Current caption to rate</p>
+            <p className="mt-2 text-base leading-7 text-slate-100">{captionText(currentCaption)}</p>
+            {currentCaption.id ? (
+              <p className="mt-3 truncate text-xs text-slate-400">Caption ID: {String(currentCaption.id)}</p>
+            ) : null}
+          </div>
 
           <div className="flex flex-wrap gap-3">
             <button
@@ -299,6 +302,83 @@ export default function ImageCaptionGenerator({ canVote = false }: Props) {
             <p className="text-xs text-amber-300">This caption record is missing an ID, so voting is disabled for this item.</p>
           ) : null}
         </article>
+      ) : null}
+
+      {generatedCaptions.length > 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-sky-200">Generated captions</h3>
+              <p className="mt-1 text-xs text-slate-300">
+                Previewing a few generated captions. Open the full list only when you want to inspect every saved row.
+              </p>
+            </div>
+            <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold text-sky-200">
+              {generatedCaptions.length} captions
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            {generatedCaptions.slice(0, 3).map((caption, index) => {
+              const isCurrent = index === currentCaptionIndex && !hasCompletedVoting;
+
+              return (
+                <article
+                  key={String(caption.id ?? index)}
+                  className={`rounded-xl border p-3 ${
+                    isCurrent ? "border-sky-300/50 bg-sky-400/10" : "border-white/10 bg-white/5"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5 text-[11px] text-slate-300">
+                      Caption {index + 1}
+                    </span>
+                    {isCurrent ? (
+                      <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-200">
+                        Currently rating
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-100">{captionText(caption)}</p>
+                </article>
+              );
+            })}
+          </div>
+
+          {generatedCaptions.length > 3 ? (
+            <details className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-sky-200">
+                Click to see all {generatedCaptions.length} captions
+              </summary>
+              <div className="mt-3 grid gap-2">
+                {generatedCaptions.map((caption, index) => {
+                  const isCurrent = index === currentCaptionIndex && !hasCompletedVoting;
+
+                  return (
+                    <article key={String(caption.id ?? index)} className="rounded-lg border border-white/10 bg-slate-950/45 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5 text-[11px] text-slate-300">
+                          Caption {index + 1}
+                        </span>
+                        {caption.id ? (
+                          <span className="max-w-full truncate rounded-full border border-white/10 bg-slate-950/60 px-2 py-0.5 text-[11px] text-slate-400">
+                            ID: {String(caption.id)}
+                          </span>
+                        ) : null}
+                        {isCurrent ? (
+                          <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-2 py-0.5 text-[11px] text-sky-200">
+                            Currently rating
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-100">{captionText(caption)}</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </details>
+          ) : null}
+        </div>
       ) : null}
 
       {voteStatus === "error" && voteMessage ? <p className="text-sm text-rose-300">{voteMessage}</p> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CaptionCard } from "@/lib/caption-feed";
 
 type ApiResponse = {
@@ -18,8 +18,15 @@ const surfaceClass =
 const voteButtonClass =
   "rounded-full px-5 py-2.5 text-sm font-semibold transition duration-300 disabled:cursor-not-allowed disabled:opacity-60";
 
-async function fetchRandomCaption() {
-  const response = await fetch("/api/captions/random", {
+async function fetchRandomCaption(excludeCaptionIds: string[] = []) {
+  const params = new URLSearchParams();
+  excludeCaptionIds.forEach((id) => {
+    if (id) params.append("exclude", id);
+  });
+
+  const url = params.toString() ? `/api/captions/random?${params.toString()}` : "/api/captions/random";
+
+  const response = await fetch(url, {
     method: "GET",
     cache: "no-store",
     credentials: "include",
@@ -38,19 +45,22 @@ export default function CaptionVoteForm() {
   const [currentCaption, setCurrentCaption] = useState<CaptionCard | null>(null);
   const [status, setStatus] = useState<"loading" | "idle" | "saving" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [recentCaptions, setRecentCaptions] = useState<CaptionCard[]>([]);
+  const seenCaptionIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadInitialCaption() {
       try {
-        const caption = await fetchRandomCaption();
+        const caption = await fetchRandomCaption([...seenCaptionIdsRef.current]);
 
         if (!isMounted) {
           return;
         }
 
         setCurrentCaption(caption);
+        rememberCaption(caption);
         setStatus("idle");
       } catch (error) {
         if (!isMounted) {
@@ -69,14 +79,51 @@ export default function CaptionVoteForm() {
     };
   }, []);
 
-  async function loadNextRandomCaption() {
+  function rememberCaption(caption: CaptionCard | null) {
+    if (!caption) {
+      return;
+    }
+    seenCaptionIdsRef.current.add(caption.id);
+
+    setRecentCaptions((current) => {
+      const withoutDuplicate = current.filter((item) => item.id !== caption.id);
+      return [caption, ...withoutDuplicate].slice(0, 5);
+    });
+  }
+
+  async function loadNextRandomCaption(previousCaptionId?: string) {
     setStatus("loading");
-    setMessage("");
 
     try {
-      const caption = await fetchRandomCaption();
+      const excludedIds = new Set(seenCaptionIdsRef.current);
+      if (previousCaptionId) excludedIds.add(previousCaptionId);
+
+      let caption: CaptionCard | null = null;
+
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const candidate = await fetchRandomCaption([...excludedIds]);
+        if (!candidate) {
+          break;
+        }
+
+        if (!excludedIds.has(candidate.id)) {
+          caption = candidate;
+          break;
+        }
+
+        excludedIds.add(candidate.id);
+      }
+
+      if (!caption) {
+        setStatus("idle");
+        setMessage("Vote saved. No unseen captions are available right now.");
+        return;
+      }
+
       setCurrentCaption(caption);
+      rememberCaption(caption);
       setStatus("idle");
+      setMessage("");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Could not load a caption.");
@@ -108,9 +155,10 @@ export default function CaptionVoteForm() {
       return;
     }
 
+    const votedCaptionId = currentCaption.id;
     setStatus("success");
-    setMessage(`Vote saved for caption ${currentCaption.id}.`);
-    await loadNextRandomCaption();
+    setMessage(`Vote saved. Loading another caption...`);
+    await loadNextRandomCaption(votedCaptionId);
   }
 
   if (status === "loading" && !currentCaption) {
@@ -150,6 +198,16 @@ export default function CaptionVoteForm() {
       )}
 
       <p className="rounded-xl border border-white/10 bg-slate-950/80 p-4 text-slate-100">{currentCaption.text}</p>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+          Caption ID: {currentCaption.id}
+        </span>
+        {status === "loading" ? (
+          <span className="rounded-full border border-sky-300/30 bg-sky-400/10 px-3 py-1 text-sky-200">
+            Loading next caption...
+          </span>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <button
@@ -169,6 +227,33 @@ export default function CaptionVoteForm() {
           Downvote (-1)
         </button>
       </div>
+
+      {recentCaptions.length > 1 ? (
+        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">Recent caption feed</h3>
+            <span className="text-xs text-slate-400">Unseen captions loaded from Supabase</span>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {recentCaptions.slice(0, 4).map((caption) => (
+              <div key={caption.id} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 p-2">
+                <div className="flex min-w-0 items-center gap-3">
+                  {caption.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={caption.imageUrl} alt="Recent caption" className="h-12 w-12 rounded-lg object-cover" />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg border border-dashed border-white/20 bg-slate-900" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-100">{caption.text}</p>
+                    <p className="truncate text-[11px] text-slate-400">ID: {caption.id}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {message ? (
         <p className={`text-sm ${status === "error" ? "text-rose-300" : "text-emerald-200"}`}>{message}</p>
